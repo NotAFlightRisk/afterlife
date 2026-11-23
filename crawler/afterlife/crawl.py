@@ -227,8 +227,8 @@ def stats(db: sqlite3.Connection):
     years = defaultdict(Counter)
     for row in rows:
         years[row["year"]][row["fate"]] = row["n"]
-    print("year  " + "".join(f"{fate:>10}" for fate in FATES) + "    dead%")
+    print("year  " + "".join(f"{fate:>10}" for fate in FATES) + "    dead%  unsure%")
     for year, fates in sorted(years.items()):
         total = sum(fates.values())
         cells = "".join(f"{fates[fate]:>10}" for fate in FATES)
-        print(f"{year}  {cells}    {fates[DEAD] / total:6.1%}")
+        print(f"{year}  {cells}   {fates[DEAD] / total:6.1%}   {fates[UNSURE] / total:6.1%}")
