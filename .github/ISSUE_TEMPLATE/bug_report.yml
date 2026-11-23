@@ -55,8 +55,8 @@ body:
     id: environment
     attributes:
       label: Environment
-      description: Browser and OS, plus Node version if you're running it yourself.
-      placeholder: Firefox 141, Ubuntu 24.04, Node 22
+      description: Browser and OS, plus Python version if you're running the crawler yourself.
+      placeholder: Firefox 141, Ubuntu 24.04, Python 3.13
     validations:
       required: false
 
@@ -78,5 +78,5 @@ body:
           required: true
         - label: I am running the latest version
           required: true
-        - label: I agree to follow this project's [Code of Conduct](https://github.com/NotAFlightRisk/repo/blob/main/.github/CODE_OF_CONDUCT.md)
+        - label: I agree to follow this project's [Code of Conduct](https://github.com/NotAFlightRisk/afterlife/blob/main/.github/CODE_OF_CONDUCT.md)
           required: true

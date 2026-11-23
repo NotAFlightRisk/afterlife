@@ -1,68 +1,64 @@
-<h1 align="center">Project Name</h1>
+<h1 align="center">Hacker Afterlife</h1>
 <p align="center">
-<i>Short description</i>
-<br />
-<b>🌐 <a href="https://project.peng.ly/">project.peng.ly</a></b><br />
+<i>Every link that made Hacker News since 2007, checked to see which still work, which moved and which died</i>
 </p>
 
 <details>
   <summary>Contents</summary>
 
+- [About](#about)
+- [The crawler](#the-crawler)
+- [Development](#development)
+- [Credits](#credits)
+
 </details>
 
 ## About
 
+Old HN threads still get read, and the links at the top of them rot. This checks the link on every story that got 100 or more points, plus each day's top 30, and sorts it into one of five fates:
+
+- Alive - it's still there, at the same address
+- Moved - it redirects to a page that's clearly still the story
+- Dead - the domain's gone, it's a 404 or 410, or it didn't answer twice, a week apart
+- Lands elsewhere - it redirects to a home page, a parking page or something that isn't the story
+- Can't tell - a bot wall, a consent page, a server error, or robots.txt asked us not to look
+
+Dead is deliberately narrow. Anything odder than those three plain deaths goes to one of the last two, along with what we saw, so you can judge it yourself.
+
+The site that draws all this (one dot per story, by month) isn't out yet. For now the repo's just the crawler.
+
 ---
 
-## Usage
+## The crawler
 
+If you've spotted `hn-afterlife-linkcheck` in your logs, it's this. It looks at each link about once a year, one request at a time per site and a second apart. It reads no more than 400 KB of a page, never runs JavaScript, never pretends to be a browser and never follows a link onto a private address. It obeys robots.txt, so to keep it out, add:
 
----
-
-## Deployment
-
-### Option 1: Vercel
-
-Fork the repo, login to Vercel, and import it. Or just use the 1-click deploy button below 👇
-
-[![1-Click Deploy to Vercel](https://img.shields.io/badge/Deploy-Vercel-ffffff?style=for-the-badge&logo=vercel&labelColor=1b2744&link=https%3A%2F%2Fproject.peng.ly)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FNotAFlightRisk%2Frepo&demo-title=Project%20Name%20Demo&demo-url=https%3A%2F%2Fproject.peng.ly)
-
-### Option 2: Docker
-
-There's a light-weight multi-arch image on DockerHub ([`notaflightrisk/repo`](https://hub.docker.com/r/notaflightrisk/repo)) and GHCR ([`ghcr.io/notaflightrisk/repo`](https://github.com/NotAFlightRisk/repo/pkgs/container/repo)). Providing you've got Docker installed, just run:
-
-```shell
-docker run -p 3000:3000 notaflightrisk/repo
+```
+User-agent: hn-afterlife-linkcheck
+Disallow: /
 ```
 
-### Option 3: Build from source
+A link it can't check counts as "can't tell", never dead. If it's got something wrong, [tell us which link](https://github.com/NotAFlightRisk/afterlife/issues/new?template=wrong_verdict.yml) and we'll sort it.
 
-Follow the [Development](#development) steps, then run `npm run build`.<br>
-That'll put a Node server in `build/`, which you can start with `node build`.
-
----
-
-## Configuration
+GitHub repos and issues are checked through GitHub's API, and YouTube videos and X posts through their oEmbed endpoints, since those answer more reliably than the pages do.
 
 ---
 
 ## Development
 
-You'll need [Node](https://nodejs.org/) 20 or newer, plus [Git](https://git-scm.com/). It's a [SvelteKit](https://svelte.dev/docs/kit) app, so there's nothing else to install.
+You'll need [uv](https://docs.astral.sh/uv/) and [Git](https://git-scm.com/). The crawler is Python, and lives in `crawler/`.
 
 ```bash
-git clone git@github.com:NotAFlightRisk/repo.git
-cd repo
-npm install
-npm run dev
+git clone git@github.com:NotAFlightRisk/afterlife.git
+cd afterlife
+uv run --project crawler afterlife stories
+uv run --project crawler afterlife crawl
+uv run --project crawler afterlife stats
 ```
 
-The dev server is then on [localhost:5173](http://localhost:5173).<br>
-The other scripts you'll want are `npm run check` (types), `npm test` (tests) and `npm run preview` (serve a production build locally).
+`stories` pulls the story list from [Algolia's HN API](https://hn.algolia.com/api), `crawl` checks every link (a day or so for the lot), and `stats` prints how each year's links are doing. It all lives in `data/afterlife.db`. Run `crawl` again a week later and anything that didn't answer gets its second try.
 
-Alternativley, build the container with `docker build -t repo .`
-
-[![Open in VS Code](https://img.shields.io/badge/CodeSpaces-Try_Live-007ACC?style=for-the-badge&logo=vscodium&labelColor=1b2744&link=https%3A%2F%2Fgithub.com%2FNotAFlightRisk%2Frepo)](https://codespaces.new/NotAFlightRisk/repo)
+The tests are `uv run --project crawler pytest`, and lint is `uv run --project crawler ruff check`.
 
 ---
 
@@ -70,8 +66,9 @@ Alternativley, build the container with `docker build -t repo .`
 
 ##### Contributors
 
-<!-- Public repos only - the badge service asks the GitHub API anonymously, so a private one gets an error box -->
-[![contributors badge](https://readme-contribs.as93.net/contributors/NotAFlightRisk/repo?shape=squircle)](https://github.com/NotAFlightRisk/repo/graphs/contributors)
+[![contributors badge](https://readme-contribs.as93.net/contributors/NotAFlightRisk/afterlife?shape=squircle)](https://github.com/NotAFlightRisk/afterlife/graphs/contributors)
+
+Story data comes from [Algolia's HN Search API](https://hn.algolia.com/api), and the archived copies from the [Internet Archive's Wayback Machine](https://web.archive.org/).
 
 ---
 

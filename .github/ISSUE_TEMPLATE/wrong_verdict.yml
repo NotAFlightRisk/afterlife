@@ -1,0 +1,29 @@
+name: 🪦 Wrong verdict
+description: A link we called dead, moved or anything else, that isn't
+title: "[Verdict]: "
+labels: ["verdict", "triage"]
+body:
+  - type: input
+    id: story
+    attributes:
+      label: Which story?
+      description: The HN thread, or the link itself.
+      placeholder: https://news.ycombinator.com/item?id=1234567
+    validations:
+      required: true
+
+  - type: input
+    id: said
+    attributes:
+      label: What did we say?
+      placeholder: Dead, doesn't answer
+    validations:
+      required: true
+
+  - type: textarea
+    id: actually
+    attributes:
+      label: What's actually there?
+      description: Where the page lives now, or what you see when you open it.
+    validations:
+      required: true

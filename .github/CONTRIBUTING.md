@@ -7,8 +7,9 @@ Bug reports, typo fixes and whole features are all welcome. By joining in, you a
 
 ## Ways to contribute
 
-- 🐛 **Report a bug** - open a [bug report](https://github.com/NotAFlightRisk/repo/issues/new?template=bug_report.yml)
-- 💡 **Suggest a feature** - open a [feature request](https://github.com/NotAFlightRisk/repo/issues/new?template=feature_request.yml)
+- 🪦 **Report a wrong verdict** - tell us [which link](https://github.com/NotAFlightRisk/afterlife/issues/new?template=wrong_verdict.yml) we got wrong
+- 🐛 **Report a bug** - open a [bug report](https://github.com/NotAFlightRisk/afterlife/issues/new?template=bug_report.yml)
+- 💡 **Suggest a feature** - open a [feature request](https://github.com/NotAFlightRisk/afterlife/issues/new?template=feature_request.yml)
 - 📖 **Improve the docs** - typos, unclear wording and missing examples are all fair game
 - 🔧 **Submit a fix** - see below
 - 🔒 **Report a vulnerability** - please *don't* open a public issue, see [SECURITY.md](./SECURITY.md)
@@ -18,10 +19,9 @@ Bug reports, typo fixes and whole features are all welcome. By joining in, you a
 ## Getting started
 
 ```bash
-git clone git@github.com:NotAFlightRisk/repo.git
-cd repo
-npm install
-npm run dev
+git clone git@github.com:NotAFlightRisk/afterlife.git
+cd afterlife
+uv run --project crawler pytest
 ```
 
 There's a bit more detail in the [Development](./README.md#development) section of the README.
@@ -34,7 +34,7 @@ There's a bit more detail in the [Development](./README.md#development) section 
 2. **Fork it**, and branch off `main`. Name it something descriptive, like `fix/timeout-handling`.
 3. **Keep it focused.** One logical change per PR, please.
 4. **Add tests** covering the new behaviour.
-5. **Run `npm run check`, `npm run lint` and `npm test`** before you push.
+5. **Run `uv run --project crawler ruff check` and `uv run --project crawler pytest`** before you push.
 6. **Open the PR**, fill in the template, and link the issue it closes.
 
 Dont worry about getting it perfect first time, we're happy to help get it over the line.

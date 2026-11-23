@@ -4,7 +4,7 @@ Need a hand? Here's where to go 👇
 
 ## Before you ask
 
-Have a look at the [README](./README.md), especially [Usage](./README.md#usage) and [Configuration](./README.md#configuration). Then search [existing issues](https://github.com/NotAFlightRisk/repo/issues?q=is%3Aissue), because someone's likely hit the same thing.
+Have a look at the [README](./README.md), especially [The crawler](./README.md#the-crawler) and [Development](./README.md#development). Then search [existing issues](https://github.com/NotAFlightRisk/afterlife/issues?q=is%3Aissue), because someone's likely hit the same thing.
 
 ---
 
@@ -12,9 +12,10 @@ Have a look at the [README](./README.md), especially [Usage](./README.md#usage) 
 
 | I want to... | Go here |
 | ------------ | ------- |
-| Ask a question or share an idea | [Discussions](https://github.com/NotAFlightRisk/repo/discussions) |
-| Report a bug | [Bug report](https://github.com/NotAFlightRisk/repo/issues/new?template=bug_report.yml) |
-| Request a feature | [Feature request](https://github.com/NotAFlightRisk/repo/issues/new?template=feature_request.yml) |
+| Ask a question or share an idea | [Discussions](https://github.com/NotAFlightRisk/afterlife/discussions) |
+| Say we got a link wrong | [Wrong verdict](https://github.com/NotAFlightRisk/afterlife/issues/new?template=wrong_verdict.yml) |
+| Report a bug | [Bug report](https://github.com/NotAFlightRisk/afterlife/issues/new?template=bug_report.yml) |
+| Request a feature | [Feature request](https://github.com/NotAFlightRisk/afterlife/issues/new?template=feature_request.yml) |
 | Report a vulnerability | [Security policy](./SECURITY.md) - **not** a public issue |
 | Contribute a change | [Contributing guide](./CONTRIBUTING.md) |
 
