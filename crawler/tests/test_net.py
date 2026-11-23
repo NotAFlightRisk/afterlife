@@ -1,6 +1,7 @@
 import asyncio
 import errno
 
+import aiohttp
 import pytest
 
 from afterlife.net import (
@@ -96,6 +97,11 @@ def test_connection_failures_boil_down_to_kinds():
     assert kind_of(ConnectionRefusedError(errno.ECONNREFUSED, "no")) == "refused"
     assert kind_of(ConnectionResetError(errno.ECONNRESET, "rst")) == "reset"
     assert kind_of(TimeoutError()) == "timeout"
+
+
+def test_a_server_that_connects_then_says_nothing_is_a_stall_not_a_timeout():
+    assert kind_of(aiohttp.SocketTimeoutError()) == "stall"
+    assert kind_of(aiohttp.ConnectionTimeoutError()) == "timeout"
 
 
 def test_a_slow_refresh_is_a_reload_not_a_redirect():

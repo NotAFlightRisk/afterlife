@@ -102,7 +102,10 @@ class PublicResolver(AbstractResolver):
 
 
 def kind_of(exc: BaseException) -> str:
-    """Boil a connection failure down to the few kinds the classifier cares about."""
+    """Boil a connection failure down to the few kinds the classifier cares about. A stall is
+    a server that took the connection and then never answered, which is how some walls look."""
+    if isinstance(exc, aiohttp.SocketTimeoutError):
+        return "stall"
     if isinstance(exc, asyncio.TimeoutError | aiohttp.ServerTimeoutError):
         return "timeout"
     if isinstance(exc, aiohttp.ServerDisconnectedError):
@@ -230,6 +233,7 @@ class Fetcher:
         self.dns: dict[str, str] = {}
         self.robots: dict[str, RobotFileParser | str] = {}
         self.probes: dict[str, tuple[int, str]] = {}
+        self.homes: dict[str, str] = {}
 
     def gate(self, host: str) -> Gate:
         """Each site shares one gate, bar a host that asked for its own crawl-delay."""
@@ -361,6 +365,14 @@ class Fetcher:
                 gone = reply.status
             current, hops = target, hops + 1
         return Seen(current, hops=hops, error="loop")
+
+    async def home(self, origin: str) -> str:
+        """How the host's home page fails, if it does, asked once per host."""
+        if origin not in self.homes:
+            if len(self.homes) > 20_000:
+                self.homes.clear()
+            self.homes[origin] = (await self.get(origin + "/")).error
+        return self.homes[origin]
 
     async def probe(self, url: str) -> tuple[int, str]:
         """Status and title of a path that can't exist on this host, asked once per host."""

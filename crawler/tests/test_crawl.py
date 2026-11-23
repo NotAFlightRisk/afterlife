@@ -82,3 +82,8 @@ def test_reclassify_brings_old_verdicts_up_to_date(tmp_path):
     crawl.reclassify(db)
     fates = [tuple(row) for row in db.execute("select fate, evidence from checks order by id")]
     assert fates == [("moved", "moved"), ("dead", "404")]
+
+
+def test_a_host_that_stalls_every_request_is_a_wall_for_the_rest(monkeypatch):
+    saved = run_site(monkeypatch, {"fate": "unsure", "evidence": "stall"})
+    assert len(saved) == 8 and {evidence for _, evidence in saved} == {"stall"}

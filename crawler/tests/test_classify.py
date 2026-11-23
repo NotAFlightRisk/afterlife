@@ -29,8 +29,9 @@ def test_a_tls_failure_is_never_a_death():
     assert fate(Seen(STORY, error="tls"), before="noanswer") == ("unsure", "tls")
 
 
-def test_a_host_that_resets_everything_is_a_wall_not_a_death():
-    assert fate(Seen(STORY, error="reset"), before="noanswer") == ("unsure", "reset")
+@pytest.mark.parametrize("error", ["reset", "stall"])
+def test_a_host_that_resets_or_stalls_everything_is_a_wall_not_a_death(error):
+    assert fate(Seen(STORY, error=error), before="noanswer") == ("unsure", error)
 
 
 @pytest.mark.parametrize("status", [401, 402, 403, 429, 451])
