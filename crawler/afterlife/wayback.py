@@ -98,6 +98,21 @@ def due(db: sqlite3.Connection, kind: str, where: str) -> list[sqlite3.Row]:
     ).fetchall()
 
 
+async def compare_home(db: sqlite3.Connection, wayback: Wayback, story: sqlite3.Row):
+    then = await wayback.then(story["url"], story["posted"])
+    save_capture(db, story["id"], "then", then)
+    if changed(then, story["now"], story["url"]):
+        detail = {**json.loads(story["detail"]), "captured": then[0], "was": then[1]}
+        db.execute(
+            "update checks set fate = ?, evidence = ?, detail = ? where id = ?",
+            (UNSURE, "home-changed", json.dumps(detail), story["check_id"]),
+        )
+
+
+async def note_last_good(db: sqlite3.Connection, wayback: Wayback, story: sqlite3.Row):
+    save_capture(db, story["id"], "good", await wayback.last_good(story["url"]))
+
+
 async def run(db: sqlite3.Connection, limit: int | None = None):
     homes = due(db, "then", "latest.fate = 'alive' and latest.detail like '%\"then\": true%'")
     walled = due(db, "good", "latest.fate = 'unsure' and latest.evidence != 'noanswer'")
@@ -106,17 +121,15 @@ async def run(db: sqlite3.Connection, limit: int | None = None):
     )
     async with aiohttp.ClientSession() as session:
         wayback = Wayback(session)
-        for story in homes[:limit]:
-            then = await wayback.then(story["url"], story["posted"])
-            save_capture(db, story["id"], "then", then)
-            if changed(then, story["now"], story["url"]):
-                detail = {**json.loads(story["detail"]), "captured": then[0], "was": then[1]}
-                db.execute(
-                    "update checks set fate = ?, evidence = ?, detail = ? where id = ?",
-                    (UNSURE, "home-changed", json.dumps(detail), story["check_id"]),
-                )
-            db.commit()
-        for story in walled[:limit]:
-            save_capture(db, story["id"], "good", await wayback.last_good(story["url"]))
-            db.commit()
+        lookups = [(compare_home, s) for s in homes[:limit]]
+        lookups += [(note_last_good, s) for s in walled[:limit]]
+        try:
+            for done, (look_up, story) in enumerate(lookups, 1):
+                await look_up(db, wayback, story)
+                db.commit()
+                if done % 500 == 0:
+                    log.info("Wayback: %d of %d looked up", done, len(lookups))
+        except NoAnswer:
+            log.warning("The Wayback Machine has stopped answering, the next run carries on")
+            return
     log.info("Wayback pass done")
