@@ -22,6 +22,7 @@ def main():
     archive.add_argument("--limit", type=int, help="stop after this many of each")
     commands.add_parser("run", help="stories, crawl, then the Wayback pass")
     commands.add_parser("stats", help="fates by year, as things stand")
+    commands.add_parser("reclassify", help="re-run the classifier over every stored check")
     site = commands.add_parser("build", help="write the static files the site reads")
     site.add_argument("--out", type=Path, default=Path("static/data"), help="where they go")
     args = parser.parse_args()
@@ -42,5 +43,7 @@ def main():
         asyncio.run(wayback.run(db, getattr(args, "limit", None)))
     if args.command == "stats":
         crawl.stats(db)
+    if args.command == "reclassify":
+        crawl.reclassify(db)
     if args.command == "build":
         build.run(db, args.out)

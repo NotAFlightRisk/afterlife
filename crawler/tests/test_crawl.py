@@ -48,3 +48,37 @@ def test_one_good_answer_resets_the_count(monkeypatch):
     tally = Tally()
     asyncio.run(crawl.crawl_site(None, None, stories(9), tally))
     assert len(tally.saved) == 9
+
+
+def test_reclassify_brings_old_verdicts_up_to_date(tmp_path):
+    from afterlife.db import connect, save_check, save_stories
+
+    db = connect(tmp_path / "afterlife.db")
+    url, title = "https://blog.example.com/accounting.html", "The math of consulting"
+    save_stories(
+        db,
+        [
+            {
+                "id": 1,
+                "url": url,
+                "title": title,
+                "points": 100,
+                "comments": 0,
+                "posted": 0,
+                "show_hn": 0,
+            }
+        ],
+    )
+    stale = {
+        "fate": "elsewhere",
+        "evidence": "home",
+        "status": 200,
+        "title": title,
+        "final": "https://longform.example.com/accounting/",
+        "detail": {"hops": 1, "html": True},
+    }
+    save_check(db, 1, 100, stale)
+    save_check(db, 1, 200, {"fate": "dead", "evidence": "404", "detail": {"via": "github"}})
+    crawl.reclassify(db)
+    fates = [tuple(row) for row in db.execute("select fate, evidence from checks order by id")]
+    assert fates == [("moved", "moved"), ("dead", "404")]

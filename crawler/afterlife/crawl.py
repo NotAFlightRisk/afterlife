@@ -1,6 +1,7 @@
 """Checks stories a site at a time, 64 sites at once, and keeps every check."""
 
 import asyncio
+import json
 import logging
 import os
 import sqlite3
@@ -168,6 +169,49 @@ async def run(db: sqlite3.Connection, workers: int = 64, limit: int | None = Non
         reporter.cancel()
     db.commit()
     tally.report()
+
+
+def seen_of(check: sqlite3.Row, detail: dict) -> Seen:
+    """Rebuild what a stored check saw, so the classifier can have another go at it."""
+    probe = detail.get("probe")
+    return Seen(
+        check["final"] or check["url"],
+        check["status"] or 0,
+        detail.get("hops", 0),
+        detail.get("html", False),
+        check["title"] or "",
+        detail.get("parked", False),
+        detail.get("error", ""),
+        tuple(probe) if probe else None,
+        detail.get("gone", 0),
+    )
+
+
+def reclassify(db: sqlite3.Connection):
+    """Re-run the classifier over every stored check, for when it's learnt something new.
+    API answers, skipped hosts and the Wayback pass's verdicts are left as they are."""
+    checks = db.execute(
+        """select c.id, c.story, c.fate, c.evidence, c.status, c.final, c.title, c.detail, s.url,
+             s.title hn from checks c join stories s on s.id = c.story order by c.id"""
+    ).fetchall()
+    before, changed = {}, Counter()
+    for check in checks:
+        detail = json.loads(check["detail"] or "{}")
+        fixed = {"via", "skipped", "captured"} & detail.keys() or check["evidence"] == "error"
+        outcome = {"fate": check["fate"], "evidence": check["evidence"]}
+        if not fixed:
+            outcome = result(
+                check["url"], check["hn"], seen_of(check, detail), before.get(check["story"])
+            )
+        if (outcome["fate"], outcome["evidence"]) != (check["fate"], check["evidence"]):
+            db.execute(
+                "update checks set fate = ?, evidence = ?, detail = ? where id = ?",
+                (outcome["fate"], outcome["evidence"], json.dumps(outcome["detail"]), check["id"]),
+            )
+            changed[(check["fate"], outcome["fate"])] += 1
+        before[check["story"]] = outcome["evidence"]
+    db.commit()
+    log.info("%d of %d checks changed: %s", sum(changed.values()), len(checks), dict(changed))
 
 
 def stats(db: sqlite3.Connection):
