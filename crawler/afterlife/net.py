@@ -12,7 +12,7 @@ import time
 import zlib
 from collections import defaultdict
 from typing import NamedTuple
-from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
+from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
 
 import aiohttp
@@ -156,24 +156,6 @@ def next_hop(url: str, status: int, location: str | None, text: str) -> str | No
     return None
 
 
-def made_up(url: str) -> str:
-    """A sibling of this page that can't exist: same folder, or same query keys, nonsense values."""
-    parts = urlsplit(url)
-    token = f"hn-afterlife-{zlib.crc32(url.encode())}"
-    if parts.query:
-        pairs = parse_qsl(parts.query, keep_blank_values=True)
-        query = urlencode([(key, token) for key, _ in pairs])
-        return urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
-    folder = parts.path.rsplit("/", 1)[0]
-    return urlunsplit((parts.scheme, parts.netloc, f"{folder}/{token}", "", ""))
-
-
-def probe_key(url: str) -> tuple:
-    parts = urlsplit(url)
-    keys = tuple(sorted(key for key, _ in parse_qsl(parts.query, keep_blank_values=True)))
-    return parts.hostname, parts.path if keys else parts.path.rsplit("/", 1)[0], keys
-
-
 async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
     """Up to `limit` bytes of the body, or whatever arrived before the server hung up."""
     raw = bytearray()
@@ -247,7 +229,7 @@ class Fetcher:
         self.gates: dict[str, Gate] = {}
         self.dns: dict[str, str] = {}
         self.robots: dict[str, RobotFileParser | str] = {}
-        self.probes: dict[tuple, tuple[int, str]] = {}
+        self.probes: dict[str, tuple[int, str]] = {}
 
     def gate(self, host: str) -> Gate:
         """Each site shares one gate, bar a host that asked for its own crawl-delay."""
@@ -381,14 +363,15 @@ class Fetcher:
         return Seen(current, hops=hops, error="loop")
 
     async def probe(self, url: str) -> tuple[int, str]:
-        """Status and title of a sibling page that can't exist, asked once per folder."""
-        key = probe_key(url)
-        if key not in self.probes:
+        """Status and title of a path that can't exist on this host, asked once per host."""
+        host = urlsplit(url).hostname or ""
+        if host not in self.probes:
             if len(self.probes) > 20_000:
                 self.probes.clear()
-            seen = await self.get(made_up(url))
-            self.probes[key] = (seen.status, seen.title)
-        return self.probes[key]
+            made_up = f"{urlsplit(url).scheme}://{host}/hn-afterlife-{zlib.crc32(host.encode())}"
+            seen = await self.get(made_up)
+            self.probes[host] = (seen.status, seen.title)
+        return self.probes[host]
 
 
 def session() -> aiohttp.ClientSession:

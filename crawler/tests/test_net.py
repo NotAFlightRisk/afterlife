@@ -9,7 +9,6 @@ from afterlife.net import (
     decode,
     is_public,
     kind_of,
-    made_up,
     next_hop,
     robots_rules,
     title_of,
@@ -107,15 +106,6 @@ def test_a_slow_refresh_is_a_reload_not_a_redirect():
 def test_a_refresh_for_browsers_without_javascript_is_ignored():
     page = '<noscript><meta http-equiv="refresh" content="0; url=/nojs"></noscript>'
     assert next_hop(URL, 200, None, page) is None
-
-
-def test_the_probe_asks_for_a_sibling_that_cant_exist():
-    assert made_up("https://example.com/news/article.php?id=12345").startswith(
-        "https://example.com/news/article.php?id=hn-afterlife-"
-    )
-    assert made_up("https://example.com/posts/my-post").startswith(
-        "https://example.com/posts/hn-afterlife-"
-    )
 
 
 @pytest.mark.parametrize(

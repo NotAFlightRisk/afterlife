@@ -14,7 +14,7 @@ ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE = "alive", "moved", "dead", "elsewhere", "
 NO_ANSWER = {"refused", "timeout", "conn", "dns-temp"}
 WALLS = {401, 402, 403, 429, 451, 999}
 LISTING = re.compile(
-    r"/(tags?|categor(y|ies)|topics?|archives?|search|sections?|labels?)(/|$)", re.I
+    r"/(tags?|categor(y|ies)|topics?|archives?|search|sections?|labels?)(/[^/.]+)?/?$", re.I
 )
 LOGIN = re.compile(r"/(sign-?in|log-?in|authwall|servicelogin|session/new|users/sign_in)\b", re.I)
 NOT_FOUND = re.compile(
@@ -223,7 +223,7 @@ def classify(url: str, hn_title: str, seen: Seen, before: str = "") -> tuple[str
     if NOT_FOUND.search(title) and not overlap(hn_title, title):
         return (DEAD, str(seen.gone)) if seen.gone else (UNSURE, "soft404")
     if same_page(url, seen):
-        if seen.probe == (200, title) and wants_probe(url, hn_title, seen):
+        if title and seen.probe == (200, title) and wants_probe(url, hn_title, seen):
             return UNSURE, "soft404"
         return ALIVE, "alive"
     listing = is_listing(url, seen.url)

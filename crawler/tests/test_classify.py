@@ -175,3 +175,27 @@ def test_a_redirect_up_a_folder_lands_elsewhere():
     url = "https://example.com/blog/2014/05/some-post"
     seen = Seen("https://example.com/blog/2014/", 200, 1, True, "Some post archive")
     assert fate(seen, url, "Some post") == ("elsewhere", "home")
+
+
+@pytest.mark.parametrize(
+    "url,final",
+    [
+        (
+            "http://www.npr.org/blogs/money/2010/10/04/130329523/how-fake",
+            "https://www.npr.org/sections/money/2010/10/04/130329523/how-fake",
+        ),
+        (
+            "http://articles.latimes.com/2010/may/16/opinion/la-oe-0516-how-fake",
+            "https://www.latimes.com/archives/la-xpm-2010-may-16-la-oe-0516-how-fake-story.html",
+        ),
+    ],
+)
+def test_articles_that_live_under_sections_or_archives_have_moved(url, final):
+    seen = Seen(final, 200, 1, True, "How fake money got real - NPR")
+    assert fate(seen, url, "How fake money got real") == ("moved", "moved")
+
+
+def test_two_blank_titles_arent_a_soft_404():
+    url = "https://6octaves.blogspot.com/2017/06/interview.html"
+    seen = Seen(url, 200, html=True, title="", probe=(200, ""))
+    assert fate(seen, url, "Interview with a demoscener") == ("alive", "alive")
