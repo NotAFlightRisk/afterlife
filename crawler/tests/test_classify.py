@@ -110,6 +110,23 @@ def test_twitter_to_x_is_a_move():
     assert slug_match("https://twitter.com" + post, "https://x.com" + post, "A post")
 
 
+def test_one_word_of_the_title_in_the_new_address_isnt_a_move():
+    url = "https://www.ibm.com/blogs/watson/2017/03/reaching-new-records-in-speech-recognition/"
+    seen = Seen(
+        "https://www.ibm.com/products/speech-to-text", 200, 1, True, "IBM Watson Speech to Text"
+    )
+    assert fate(seen, url, "Reaching new records in speech recognition") == (
+        "elsewhere",
+        "unrelated",
+    )
+
+
+def test_an_old_numeric_address_that_now_spells_out_the_title_has_moved():
+    url = "http://www.cnbc.com/id/31849843"
+    seen = Seen("https://www.cnbc.com/2009/07/10/social-networkings-naked-truth.html", 200, 1, True)
+    assert fate(seen, url, 'Social Networking\'s "Naked" Truth') == ("moved", "moved")
+
+
 def test_a_soft_404_is_unsure():
     url = "https://example.com/some/old/page"
     seen = Seen(url, 200, html=True, title="Example", probe=(200, "Example"))

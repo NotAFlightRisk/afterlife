@@ -124,9 +124,8 @@ def slug_match(url: str, final: str, hn_title: str) -> bool:
     if min(len(old), len(new)) > 3 and (new.startswith(old) or old.startswith(new)) and same_folder:
         return True
     told = tokens(hn_title)
-    return (
-        bool(after) and len(after & told) >= 1 and len(after & (told | before)) / len(after) >= 0.5
-    )
+    kept = after & (told | before)
+    return bool(after & told) and len(kept) >= 2 and len(kept) / len(after) >= 0.5
 
 
 def is_listing(url: str, final: str) -> bool:
