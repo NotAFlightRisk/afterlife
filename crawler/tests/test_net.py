@@ -3,7 +3,17 @@ import errno
 
 import pytest
 
-from afterlife.net import PublicResolver, decode, is_public, kind_of, made_up, next_hop, title_of
+from afterlife.net import (
+    AGENT,
+    PublicResolver,
+    decode,
+    is_public,
+    kind_of,
+    made_up,
+    next_hop,
+    robots_rules,
+    title_of,
+)
 from afterlife.urls import is_root, norm, site
 
 URL = "https://zverovich.net/2016/05/13/giving-up-on-julia.html"
@@ -118,3 +128,19 @@ def test_private_ipv4_wrapped_in_ipv6_is_refused(ip):
 
 def test_a_real_ipv6_address_is_public():
     assert is_public("2606:4700:4700::1111")
+
+
+def test_a_robots_group_for_another_bot_with_a_similar_name_isnt_ours():
+    rules = robots_rules("User-agent: LinkCheck\nDisallow: /\n\nUser-agent: *\nDisallow: /search\n")
+    assert rules.can_fetch(AGENT, "https://www.theatlantic.com/technology/archive/2013/01/x/1/")
+    assert not rules.can_fetch(AGENT, "https://www.theatlantic.com/search?q=x")
+
+
+def test_a_robots_group_that_names_us_is_obeyed():
+    rules = robots_rules("User-agent: hn-afterlife-linkcheck\nDisallow: /\nCrawl-delay: 5\n")
+    assert not rules.can_fetch(AGENT, "https://example.com/anything")
+    assert rules.crawl_delay(AGENT) == 5
+
+
+def test_a_site_that_shuts_out_every_unnamed_bot_shuts_us_out():
+    assert not robots_rules("User-agent: *\nDisallow: /\n").can_fetch(AGENT, "https://x.com/a")

@@ -187,6 +187,30 @@ async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
     return bytes(raw[:limit])
 
 
+def robots_rules(text: str) -> RobotFileParser:
+    """robots.txt as RFC 9309 reads it: a group is ours only if it names our product token
+    exactly. The stdlib matches substrings, so a group for "LinkCheck" would catch us."""
+    kept, ours, in_rules = [], False, False
+    for line in text.splitlines():
+        field, _, value = line.split("#", 1)[0].partition(":")
+        field = field.strip().lower()
+        if field == "user-agent":
+            if in_rules:
+                ours, in_rules = False, False
+                kept.append("")
+            token = value.strip().split("/")[0].strip().lower()
+            if token in (AGENT, "*"):
+                kept.append(f"User-agent: {token}")
+                ours = True
+        elif field in ("allow", "disallow", "crawl-delay"):
+            in_rules = True
+            if ours:
+                kept.append(line)
+    rules = RobotFileParser()
+    rules.parse(kept)
+    return rules
+
+
 def retry_after(value: str | None) -> float:
     try:
         return min(max(float(value or 30), 30), 300)
@@ -298,7 +322,7 @@ class Fetcher:
         return "" if rules.can_fetch(AGENT, url) else "robots"
 
     async def load_robots(self, base: str) -> RobotFileParser | str:
-        rules, url = RobotFileParser(), base + "/robots.txt"
+        url = base + "/robots.txt"
         for _ in range(5):
             problem = await self.lookup(urlsplit(url).hostname or "")
             if problem:
@@ -312,10 +336,8 @@ class Fetcher:
                 continue
             if reply.status >= 500:
                 return "robots-error"
-            rules.parse(reply.text.splitlines() if 200 <= reply.status < 300 else [])
-            return rules
-        rules.parse([])
-        return rules
+            return robots_rules(reply.text if 200 <= reply.status < 300 else "")
+        return robots_rules("")
 
     async def get(self, url: str) -> Seen:
         """Follow a URL to wherever it ends up, each hop polite to its own host. Cookies only
