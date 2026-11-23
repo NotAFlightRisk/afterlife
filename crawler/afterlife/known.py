@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 import aiohttp
 
 from .classify import ALIVE, DEAD, MOVED, UNSURE
-from .net import TIMEOUT, UA, Fetcher, Gate, NoAnswer, kind_of
+from .net import TIMEOUT, UA, Fetcher, Gate, NoAnswer, kind_of, retry_after
 
 GITHUB = re.compile(
     r"https?://(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?(?:/(issues|pull)/(\d+))?/?(?:[?#].*)?$",
@@ -40,10 +40,11 @@ async def get_json(fetcher: Fetcher, gate: Gate, url: str, headers: dict | None 
 
 
 class GitHub:
-    """Repos and issues through the REST API, 5,000 an hour with a token."""
+    """Repos and issues through the REST API. The token's 5,000 an hour is shared with whatever
+    else uses it, so this takes under half and steps aside when under 30% is left."""
 
     def __init__(self, fetcher: Fetcher, token: str):
-        self.fetcher, self.gate = fetcher, Gate(0.75)
+        self.fetcher, self.gate = fetcher, Gate(1.5)
         self.headers = {
             "Authorization": f"Bearer {token}",
             "Accept": "application/vnd.github+json",
@@ -55,12 +56,13 @@ class GitHub:
             status, data, headers = await get_json(
                 self.fetcher, self.gate, "https://api.github.com" + path, self.headers
             )
-            limited = headers.get("x-ratelimit-remaining") == "0" or "retry-after" in headers
-            if status in (403, 429) and limited:
-                reset = int(headers.get("x-ratelimit-reset", 0)) - time.time()
-                self.gate.hold(max(reset, float(headers.get("retry-after", 0)), 0) + 5)
-                continue
-            return status, data
+            remaining = int(headers.get("x-ratelimit-remaining", 1))
+            if remaining < int(headers.get("x-ratelimit-limit", 0)) * 0.3:
+                self.gate.hold(max(int(headers.get("x-ratelimit-reset", 0)) - time.time(), 0) + 5)
+            limited = status in (403, 429) and (remaining == 0 or "retry-after" in headers)
+            if not limited:
+                return status, data
+            self.gate.hold(retry_after(headers.get("retry-after")))
 
     async def check(self, url: str, match: re.Match) -> dict | None:
         """None when only the page itself can settle it (a 404 might be /blog/something)."""

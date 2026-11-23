@@ -21,7 +21,7 @@ from .classify import Seen, is_parked
 from .urls import norm, site
 
 AGENT = "hn-afterlife-linkcheck"
-UA = f"{AGENT}/1.0 (+https://afterlife.peng.ly/about)"
+UA = f"{AGENT}/1.0 (+https://github.com/NotAFlightRisk/afterlife)"
 HEADERS = {"User-Agent": UA, "Accept": "text/html,*/*;q=0.8", "Accept-Language": "en"}
 TIMEOUT = aiohttp.ClientTimeout(total=45, connect=10, sock_read=20)
 MAX_BODY, MAX_ROBOTS, MAX_HOPS = 400_000, 500_000, 10
