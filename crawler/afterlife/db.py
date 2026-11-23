@@ -26,6 +26,15 @@ create table if not exists checks (
   detail text
 );
 create index if not exists checks_story on checks(story, at);
+create table if not exists captures (
+  story integer not null references stories(id),
+  at integer not null,
+  kind text not null,
+  captured text,
+  status integer,
+  title text
+);
+create index if not exists captures_story on captures(story, kind);
 """
 
 

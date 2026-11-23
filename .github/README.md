@@ -58,6 +58,8 @@ uv run --project crawler afterlife stats
 
 `stories` pulls the story list from [Algolia's HN API](https://hn.algolia.com/api), `crawl` checks every link (a day or so for the lot), and `stats` prints how each year's links are doing. It all lives in `data/afterlife.db`. Run `crawl` again a week later and anything that didn't answer gets its second try.
 
+`wayback` then asks the [Wayback Machine](https://web.archive.org/) about two kinds of link, at the 15 or so a minute it allows. Home pages that no longer look like the story get compared with their capture from around the day they were posted, and links behind a wall get the newest capture that isn't one. That's a couple of days for the lot. `run` does `stories`, `crawl` and `wayback` in one go.
+
 The tests are `uv run --project crawler pytest`, and lint is `uv run --project crawler ruff check`.
 
 ---

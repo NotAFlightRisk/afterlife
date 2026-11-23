@@ -55,6 +55,7 @@ iains-notes/
 
 # Crawl state
 /data/
+/static/data/
 
 # Python
 __pycache__/
