@@ -8,7 +8,7 @@ from urllib.parse import urlencode
 import aiohttp
 
 from .classify import ALIVE, DEAD, MOVED, UNSURE
-from .net import TIMEOUT, UA, Fetcher, Gate, NoAnswer, kind_of, retry_after
+from .net import MAX_WAIT, TIMEOUT, UA, Fetcher, Gate, NoAnswer, kind_of, retry_after
 
 GITHUB = re.compile(
     r"https?://(?:www\.)?github\.com/([\w.-]+)/([\w.-]+?)(?:\.git)?(?:/(issues|pull)/(\d+))?/?(?:[?#].*)?$",
@@ -96,14 +96,15 @@ class GitHub:
         }
 
 
-async def oembed(
-    fetcher: Fetcher, endpoint: str, target: str, moved_to: str = "", gone=(404,)
-) -> dict:
+async def oembed(fetcher: Fetcher, endpoint: str, target: str, moved_to: str = "") -> dict:
     """A video or post through its oEmbed endpoint. Their pages need JavaScript, so this is the
     only answer worth having, and a rate limit gets waited out rather than guessed round."""
     gate = fetcher.gate(endpoint.split("/")[2])
     query = urlencode({"format": "json", "url": target})
+    status = 429
     for _ in range(3):
+        if gate.wait() > MAX_WAIT:
+            break
         status, data, headers = await get_json(fetcher, gate, f"{endpoint}?{query}")
         if status != 429:
             break
@@ -119,7 +120,7 @@ async def oembed(
             "title": (data or {}).get("title") or (data or {}).get("author_name"),
             "detail": detail,
         }
-    if status in gone:
+    if status == 404:
         return {"fate": DEAD, "evidence": "404", "status": status, "detail": detail}
     if status in (401, 403):
         return {"fate": UNSURE, "evidence": "private", "status": status, "detail": detail}
@@ -132,7 +133,7 @@ async def check(fetcher: Fetcher, github: GitHub | None, url: str) -> dict | Non
         return await github.check(url, match)
     if match := YOUTUBE.match(url):
         video = f"https://www.youtube.com/watch?v={match.group(1)}"
-        return await oembed(fetcher, "https://www.youtube.com/oembed", video, gone=(400, 404))
+        return await oembed(fetcher, "https://www.youtube.com/oembed", video)
     if match := TWEET.match(url):
         brand, user, post = match.groups()
         on_x = f"https://x.com/{user}/status/{post}"

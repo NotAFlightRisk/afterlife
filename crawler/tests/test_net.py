@@ -1,16 +1,23 @@
 import asyncio
 import errno
+import time
+from email.utils import formatdate
 
 import aiohttp
 import pytest
 
 from afterlife.net import (
     AGENT,
+    MAX_WAIT,
+    Fetcher,
+    NoAnswer,
     PublicResolver,
     decode,
     is_public,
     kind_of,
     next_hop,
+    read_capped,
+    retry_after,
     robots_rules,
     title_of,
 )
@@ -140,3 +147,49 @@ def test_a_robots_group_that_names_us_is_obeyed():
 
 def test_a_site_that_shuts_out_every_unnamed_bot_shuts_us_out():
     assert not robots_rules("User-agent: *\nDisallow: /\n").can_fetch(AGENT, "https://x.com/a")
+
+
+def test_retry_after_takes_seconds_or_a_date_and_never_hurries():
+    assert retry_after("3600") == 3600
+    assert retry_after("5") == 30
+    assert 3500 < retry_after(formatdate(time.time() + 3600, usegmt=True)) <= 3600
+    assert retry_after("soonish") == 60
+
+
+def test_a_site_that_wants_a_long_rest_gets_it_without_being_asked_again():
+    fetcher = Fetcher(session=None)
+    fetcher.gate("busy.example").hold(MAX_WAIT + 60)
+    reply = asyncio.run(fetcher.send("https://busy.example/a", 1000))
+    assert reply.status == 429
+
+
+def test_a_crawl_delay_counts_from_the_robots_request():
+    fetcher = Fetcher(session=None)
+
+    async def load_robots(base):
+        return robots_rules("User-agent: *\nCrawl-delay: 10\n")
+
+    fetcher.load_robots = load_robots
+    assert asyncio.run(fetcher.allowed("https://slow.example/a")) == ""
+    assert 9 < fetcher.gate("slow.example").wait() <= 10
+
+
+class Cut:
+    """A response body that hangs up partway."""
+
+    def __init__(self):
+        self.content = self
+
+    async def iter_chunked(self, size):
+        yield b"User-agent: *\n"
+        raise aiohttp.ClientPayloadError("cut off")
+
+
+def test_half_a_page_is_still_a_page():
+    assert asyncio.run(read_capped(Cut(), 1000)) == b"User-agent: *\n"
+
+
+def test_half_a_robots_txt_is_no_robots_txt():
+    with pytest.raises(NoAnswer) as failed:
+        asyncio.run(read_capped(Cut(), 1000, whole=True))
+    assert failed.value.kind == "robots-error"

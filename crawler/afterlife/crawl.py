@@ -36,14 +36,17 @@ def github_token() -> str | None:
 
 
 def pending(db: sqlite3.Connection, now: int) -> list[sqlite3.Row]:
-    """Stories never checked, plus those whose last check said to try again in a week."""
+    """Stories never checked, plus those whose last check said to try again in a week, which
+    includes the server falling over."""
     marks = ",".join("?" * len(TRY_AGAIN))
     return db.execute(
         f"""with {LATEST}
             select s.id, s.url, s.title, latest.evidence before from stories s
             left join latest on latest.story = s.id
             where s.url is not null
-              and (latest.id is null or (latest.evidence in ({marks}) and latest.at < ?))
+              and (latest.id is null or (
+                (latest.evidence in ({marks}) or latest.evidence like 'status-5%')
+                and latest.at < ?))
             order by s.id""",
         (*TRY_AGAIN, now - RECHECK_AFTER),
     ).fetchall()
@@ -78,9 +81,9 @@ async def check(fetcher: Fetcher, github: known.GitHub | None, story: sqlite3.Ro
     except NoAnswer as failure:
         return result(url, title, Seen(url, error=failure.kind), story["before"])
     seen = await fetcher.get(url)
-    if seen.error in WALLED:
-        home = seen.error if is_root(seen.url) else await fetcher.home(origin(seen.url))
-        if home not in WALLED:
+    if seen.error in WALLED and not is_root(seen.url):
+        home = await fetcher.home(origin(seen.url))
+        if classify(home.url, "", home)[0] not in (UNSURE, DEAD):
             seen = replace(seen, error="conn")
     if wants_probe(url, title, seen):
         seen = replace(seen, probe=await fetcher.probe(seen.url))
@@ -110,20 +113,17 @@ class Tally:
 
 async def crawl_site(fetcher, github, stories: list[sqlite3.Row], tally: Tally):
     """One site's stories in turn. A host that fails five times running gets left alone: the
-    rest of its stories get the same wall, count as not answering, or wait for the next run if
-    it was rate limiting."""
+    rest of its stories get the same wall, or wait for the next run if it stopped answering or
+    was rate limiting, since only a story's own two tries can call it dead."""
     streak, last_failure = Counter(), {}
     for story in stories:
-        url, host = story["url"], host_of(story["url"])
+        host = host_of(story["url"])
         if streak[host] >= STREAK_LIMIT:
             evidence = last_failure[host]
-            if evidence == "wall-429":
-                continue
             if evidence in WALLED:
-                outcome = {"fate": UNSURE, "evidence": evidence}
-            else:
-                outcome = result(url, story["title"], Seen(url, error="conn"), story["before"])
-            tally.add(story, {**outcome, "detail": {"skipped": True}})
+                tally.add(
+                    story, {"fate": UNSURE, "evidence": evidence, "detail": {"skipped": True}}
+                )
             continue
         try:
             outcome = await check(fetcher, github, story)

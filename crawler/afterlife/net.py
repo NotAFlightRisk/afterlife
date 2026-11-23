@@ -11,6 +11,7 @@ import ssl
 import time
 import zlib
 from collections import defaultdict
+from email.utils import parsedate_to_datetime
 from typing import NamedTuple
 from urllib.parse import urljoin, urlsplit
 from urllib.robotparser import RobotFileParser
@@ -26,7 +27,7 @@ AGENT = "hn-afterlife-linkcheck"
 UA = f"{AGENT}/1.0 (+https://github.com/NotAFlightRisk/afterlife)"
 HEADERS = {"User-Agent": UA, "Accept": "text/html,*/*;q=0.8", "Accept-Language": "en"}
 TIMEOUT = aiohttp.ClientTimeout(total=45, connect=10, sock_read=20)
-MAX_BODY, MAX_ROBOTS, MAX_HOPS, MAX_DELAY = 400_000, 500_000, 10, 120
+MAX_BODY, MAX_ROBOTS, MAX_HOPS, MAX_DELAY, MAX_WAIT = 400_000, 500_000, 10, 120, 300
 REDIRECTS = {301, 302, 303, 307, 308}
 GONE_DNS = {socket.EAI_NONAME, getattr(socket, "EAI_NODATA", -5)}
 SETTLED = {"dns", "private", "badurl"}
@@ -159,9 +160,10 @@ def next_hop(url: str, status: int, location: str | None, text: str) -> str | No
     return None
 
 
-async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
+async def read_capped(response: aiohttp.ClientResponse, limit: int, whole=False) -> bytes:
     """Up to `limit` bytes of the body, or whatever arrived before the server hung up or went
-    quiet. The status is already in, so a slow body is still an answer."""
+    quiet. The status is already in, so a slow page is still an answer, but half a robots.txt
+    isn't one."""
     raw = bytearray()
     try:
         async for chunk in response.content.iter_chunked(65536):
@@ -169,7 +171,8 @@ async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
             if len(raw) >= limit:
                 break
     except (aiohttp.ClientPayloadError, TimeoutError):
-        pass
+        if whole:
+            raise NoAnswer("robots-error") from None
     return bytes(raw[:limit])
 
 
@@ -198,10 +201,15 @@ def robots_rules(text: str) -> RobotFileParser:
 
 
 def retry_after(value: str | None) -> float:
+    """How long a server asked us to back off, in seconds or as a date, and never under 30."""
     try:
-        return min(max(float(value or 30), 30), 300)
+        wait = float(value or 30)
     except ValueError:
-        return 60
+        try:
+            wait = parsedate_to_datetime(value).timestamp() - time.time()
+        except (TypeError, ValueError):
+            wait = 60
+    return max(wait, 30)
 
 
 LEGACY_TLS = legacy_tls()
@@ -226,6 +234,9 @@ class Gate:
     def hold(self, seconds: float):
         self.free_at = max(self.free_at, time.monotonic() + seconds)
 
+    def wait(self) -> float:
+        return self.free_at - time.monotonic()
+
 
 class Fetcher:
     def __init__(self, session: aiohttp.ClientSession, gap: float = 1.0):
@@ -234,7 +245,7 @@ class Fetcher:
         self.dns: dict[str, str] = {}
         self.robots: dict[str, RobotFileParser | str] = {}
         self.probes: dict[str, tuple[int, str]] = {}
-        self.homes: dict[str, str] = {}
+        self.homes: dict[str, Seen] = {}
 
     def gate(self, host: str) -> Gate:
         """Each site shares one gate, bar a host that asked for its own crawl-delay."""
@@ -261,10 +272,13 @@ class Fetcher:
         return self.dns[host]
 
     async def send(
-        self, url: str, limit: int, any_type=False, tls=None, cookies: dict | None = None
+        self, url: str, limit: int, robots=False, tls=None, cookies: dict | None = None
     ) -> Reply:
-        """One polite GET, no redirects followed."""
+        """One polite GET, no redirects followed. A site that's asked for more than five minutes'
+        peace gets it, and its stories come back rate limited without being asked for."""
         gate = self.gate(urlsplit(url).hostname or "")
+        if gate.wait() > MAX_WAIT:
+            return Reply(429, None, False, "", {})
         try:
             async with (
                 gate,
@@ -279,7 +293,8 @@ class Fetcher:
             ):
                 kind = r.headers.get("content-type", "").lower()
                 is_html = not kind or "html" in kind
-                text = decode(await read_capped(r, limit), r.charset) if is_html or any_type else ""
+                raw = await read_capped(r, limit, whole=robots) if is_html or robots else b""
+                text = decode(raw, r.charset)
                 if r.status == 429 or (r.status == 503 and "retry-after" in r.headers):
                     gate.hold(retry_after(r.headers.get("retry-after")))
                 jar = {name: morsel.value for name, morsel in r.cookies.items()}
@@ -287,7 +302,7 @@ class Fetcher:
         except aiohttp.ClientSSLError:
             if tls is not None:
                 raise NoAnswer("tls") from None
-            return await self.send(url, limit, any_type, LEGACY_TLS, cookies)
+            return await self.send(url, limit, robots, LEGACY_TLS, cookies)
         except (TimeoutError, aiohttp.ClientError, OSError, ValueError) as e:
             raise NoAnswer(kind_of(e)) from e
 
@@ -302,8 +317,10 @@ class Fetcher:
             if not isinstance(rules, str) or rules in SETTLED:
                 self.robots[key] = rules
             if not isinstance(rules, str) and (delay := rules.crawl_delay(AGENT)):
-                host = urlsplit(url).hostname or ""
-                self.gates[host] = Gate(max(self.gap, min(float(delay), MAX_DELAY)))
+                gap = max(self.gap, min(float(delay), MAX_DELAY))
+                gate = self.gates.setdefault(urlsplit(url).hostname or "", Gate(gap))
+                gate.gap = gap
+                gate.hold(gap)
         if isinstance(rules, str):
             return rules
         return "" if rules.can_fetch(AGENT, url) else "robots"
@@ -315,13 +332,13 @@ class Fetcher:
             if problem:
                 return problem
             try:
-                reply = await self.send(url, MAX_ROBOTS, any_type=True)
+                reply = await self.send(url, MAX_ROBOTS, robots=True)
             except NoAnswer as e:
                 return e.kind
             if reply.status in REDIRECTS and reply.location:
                 url = urljoin(url, reply.location)
                 continue
-            if reply.status >= 500:
+            if reply.status >= 500 or reply.status == 429:
                 return "robots-error"
             return robots_rules(reply.text if 200 <= reply.status < 300 else "")
         return robots_rules("")
@@ -367,12 +384,12 @@ class Fetcher:
             current, hops = target, hops + 1
         return Seen(current, hops=hops, error="loop")
 
-    async def home(self, origin: str) -> str:
-        """How the host's home page fails, if it does, asked once per host."""
+    async def home(self, origin: str) -> Seen:
+        """What the host's home page says, asked once per host."""
         if origin not in self.homes:
             if len(self.homes) > 20_000:
                 self.homes.clear()
-            self.homes[origin] = (await self.get(origin + "/")).error
+            self.homes[origin] = await self.get(origin + "/")
         return self.homes[origin]
 
     async def probe(self, url: str) -> tuple[int, str]:
