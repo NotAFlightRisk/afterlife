@@ -16,6 +16,7 @@ from urllib.robotparser import RobotFileParser
 
 import aiohttp
 from aiohttp.abc import AbstractResolver
+from yarl import URL
 
 from .classify import Seen, is_parked
 from .urls import norm, site
@@ -24,7 +25,7 @@ AGENT = "hn-afterlife-linkcheck"
 UA = f"{AGENT}/1.0 (+https://github.com/NotAFlightRisk/afterlife)"
 HEADERS = {"User-Agent": UA, "Accept": "text/html,*/*;q=0.8", "Accept-Language": "en"}
 TIMEOUT = aiohttp.ClientTimeout(total=45, connect=10, sock_read=20)
-MAX_BODY, MAX_ROBOTS, MAX_HOPS = 400_000, 500_000, 10
+MAX_BODY, MAX_ROBOTS, MAX_HOPS, MAX_DELAY = 400_000, 500_000, 10, 120
 REDIRECTS = {301, 302, 303, 307, 308}
 GONE_DNS = {socket.EAI_NONAME, getattr(socket, "EAI_NODATA", -5)}
 
@@ -184,16 +185,17 @@ class Fetcher:
         return self.gates[key]
 
     async def lookup(self, host: str) -> str:
-        """'' when the host has a public address, else why not."""
+        """'' when the host has a public address, else why not. Encoded the way aiohttp will
+        connect to it, since the stdlib's older IDNA turns straße.de into strasse.de."""
         if host not in self.dns:
             try:
-                found = await asyncio.get_running_loop().getaddrinfo(
-                    host, 443, type=socket.SOCK_STREAM
-                )
+                ascii_host = URL.build(scheme="http", host=host).raw_host
+                loop = asyncio.get_running_loop()
+                found = await loop.getaddrinfo(ascii_host, 443, type=socket.SOCK_STREAM)
                 self.dns[host] = "" if any(is_public(f[4][0]) for f in found) else "private"
             except socket.gaierror as e:
                 self.dns[host] = "dns" if e.errno in GONE_DNS else "dns-temp"
-            except UnicodeError:
+            except ValueError:
                 self.dns[host] = "dns"
         return self.dns[host]
 
@@ -238,6 +240,9 @@ class Fetcher:
         rules = self.robots[key]
         if isinstance(rules, str):
             return rules
+        if delay := rules.crawl_delay(AGENT):
+            gate = self.gate(urlsplit(url).hostname or "")
+            gate.gap = max(gate.gap, min(float(delay), MAX_DELAY))
         return "" if rules.can_fetch(AGENT, url) else "robots"
 
     async def load_robots(self, base: str) -> RobotFileParser | str:
