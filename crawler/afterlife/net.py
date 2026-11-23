@@ -48,6 +48,7 @@ JS_SWAP = re.compile(
 )
 TITLE = re.compile(r"<title[^>]*>(.*?)</title>", re.S | re.I)
 CHARSET = re.compile(rb"""<meta[^>]+charset=["']?([\w-]+)""", re.I)
+COOKIE_NAME = re.compile(r"[\w!#$%&'*+.^`|~:-]+", re.ASCII)
 
 
 class Reply(NamedTuple):
@@ -297,7 +298,7 @@ class Fetcher:
                 text = decode(raw, r.charset)
                 if r.status == 429 or (r.status == 503 and "retry-after" in r.headers):
                     gate.hold(retry_after(r.headers.get("retry-after")))
-                jar = {name: morsel.value for name, morsel in r.cookies.items()}
+                jar = {n: m.value for n, m in r.cookies.items() if COOKIE_NAME.fullmatch(n)}
                 return Reply(r.status, r.headers.get("location"), is_html, text, jar)
         except aiohttp.ClientSSLError:
             if tls is not None:

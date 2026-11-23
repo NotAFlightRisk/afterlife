@@ -8,6 +8,7 @@ import pytest
 
 from afterlife.net import (
     AGENT,
+    COOKIE_NAME,
     MAX_WAIT,
     Fetcher,
     NoAnswer,
@@ -193,3 +194,8 @@ def test_half_a_robots_txt_is_no_robots_txt():
     with pytest.raises(NoAnswer) as failed:
         asyncio.run(read_capped(Cut(), 1000, whole=True))
     assert failed.value.kind == "robots-error"
+
+
+def test_a_cookie_name_python_wont_send_back_is_dropped():
+    assert COOKIE_NAME.fullmatch("session_id")
+    assert not COOKIE_NAME.fullmatch("gdpr[consent_types]")
