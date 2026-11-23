@@ -160,14 +160,15 @@ def next_hop(url: str, status: int, location: str | None, text: str) -> str | No
 
 
 async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
-    """Up to `limit` bytes of the body, or whatever arrived before the server hung up."""
+    """Up to `limit` bytes of the body, or whatever arrived before the server hung up or went
+    quiet. The status is already in, so a slow body is still an answer."""
     raw = bytearray()
     try:
         async for chunk in response.content.iter_chunked(65536):
             raw += chunk
             if len(raw) >= limit:
                 break
-    except aiohttp.ClientPayloadError:
+    except (aiohttp.ClientPayloadError, TimeoutError):
         pass
     return bytes(raw[:limit])
 
