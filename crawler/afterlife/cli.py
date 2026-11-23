@@ -1,5 +1,6 @@
 import argparse
 import asyncio
+import fcntl
 import logging
 from pathlib import Path
 
@@ -27,6 +28,12 @@ def main():
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     db = connect(args.db)
+    lock = open(f"{args.db}.lock", "w")  # noqa: SIM115 - held until we exit
+    if args.command not in ("stats", "build"):
+        try:
+            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            parser.exit(1, f"Something else is already crawling into {args.db}\n")
     if args.command in ("stories", "run"):
         asyncio.run(hn.fetch(db))
     if args.command in ("crawl", "run"):

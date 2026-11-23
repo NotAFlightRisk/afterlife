@@ -19,10 +19,14 @@ def test_a_domain_that_no_longer_resolves_is_dead():
     assert fate(Seen(STORY, error="dns")) == ("dead", "dns")
 
 
-@pytest.mark.parametrize("error", ["timeout", "refused", "tls", "conn", "dns-temp"])
+@pytest.mark.parametrize("error", ["timeout", "refused", "conn", "dns-temp"])
 def test_no_answer_waits_for_its_second_try(error):
     assert fate(Seen(STORY, error=error)) == ("unsure", "noanswer")
     assert fate(Seen(STORY, error=error), before="noanswer") == ("dead", "noanswer-twice")
+
+
+def test_a_tls_failure_is_never_a_death():
+    assert fate(Seen(STORY, error="tls"), before="noanswer") == ("unsure", "tls")
 
 
 def test_a_host_that_resets_everything_is_a_wall_not_a_death():
@@ -123,3 +127,51 @@ def test_a_home_page_that_changed_title_gets_the_wayback_check():
     seen = Seen(url, 200, html=True, title="A pollinator garden")
     assert wants_then(url, "Show HN: Straight2Spam", seen)
     assert not wants_then(url, "Show HN: A pollinator garden", seen)
+
+
+def test_a_redirect_to_a_tag_page_is_not_a_move():
+    url, title = "https://example.com/2014/postgres-tricks", "Postgres tricks"
+    seen = Seen("https://example.com/tag/postgres/", 200, 1, True, "Postgres | Example")
+    assert fate(seen, url, title) == ("elsewhere", "home")
+
+
+@pytest.mark.parametrize("junk", ["?guccounter=1", ";jsessionid=ABC123"])
+def test_a_session_or_consent_bit_on_the_same_page_is_alive(junk):
+    seen = Seen(STORY + junk, 200, 1, True, "Something else entirely")
+    assert fate(seen) == ("alive", "alive")
+
+
+def test_a_sign_in_page_is_unsure():
+    url = "https://docs.google.com/document/d/abc/edit"
+    seen = Seen("https://accounts.google.com/v3/signin/identifier", 200, 2, True, "Sign in")
+    assert fate(seen, url, "A design doc") == ("unsure", "login")
+
+
+def test_a_page_that_says_not_found_is_a_soft_404():
+    seen = Seen(STORY, 200, html=True, title="Page not found | Example")
+    assert fate(seen) == ("unsure", "soft404")
+
+
+def test_a_404_that_bounces_to_the_home_page_is_dead():
+    seen = Seen("https://example.com/", 200, 1, True, "Example", gone=404)
+    assert fate(seen) == ("dead", "404")
+
+
+def test_a_404_that_bounces_to_the_story_has_moved():
+    seen = Seen("https://vitaut.net/posts/2016/giving-up-on-julia/", 200, 1, True, TITLE, gone=404)
+    assert fate(seen) == ("moved", "moved")
+
+
+def test_dropping_the_html_extension_is_a_move_not_a_parent_folder():
+    url = "http://blog.asmartbear.com/consulting-company-accounting.html"
+    title = "The unfortunate math behind consulting companies"
+    seen = Seen(
+        "https://longform.asmartbear.com/consulting-company-accounting/", 200, 1, True, title
+    )
+    assert fate(seen, url, title) == ("moved", "moved")
+
+
+def test_a_redirect_up_a_folder_lands_elsewhere():
+    url = "https://example.com/blog/2014/05/some-post"
+    seen = Seen("https://example.com/blog/2014/", 200, 1, True, "Some post archive")
+    assert fate(seen, url, "Some post") == ("elsewhere", "home")

@@ -7,7 +7,10 @@ ROOTISH = re.compile(r"/(index\.\w+|home|en|en-us|[a-z]{2}(-[a-z]{2})?)/?")
 
 
 def host_of(url: str) -> str:
-    return (urlsplit(url).hostname or "").removeprefix("www.")
+    try:
+        return (urlsplit(url).hostname or "").removeprefix("www.")
+    except ValueError:
+        return ""
 
 
 def site(host: str) -> str:
@@ -18,16 +21,25 @@ def site(host: str) -> str:
     return ".".join(parts[-2:])
 
 
-def query_of(url: str) -> str:
+def pairs_of(url: str) -> set[tuple[str, str]]:
     pairs = parse_qsl(urlsplit(url).query, keep_blank_values=True)
-    return urlencode(sorted((k, v) for k, v in pairs if not TRACKING.match(k)))
+    return {(k, v) for k, v in pairs if not TRACKING.match(k)}
+
+
+def query_of(url: str) -> str:
+    return urlencode(sorted(pairs_of(url)))
+
+
+def page_of(url: str) -> str:
+    """Host and path, minus www, trailing slashes, index pages and ;jsessionid-style bits."""
+    path = urlsplit(url).path.split(";", 1)[0]
+    return host_of(url) + re.sub(r"/(index\.(html?|php))?$", "", path).lower()
 
 
 def norm(url: str) -> str:
     """Scheme, www, trailing slashes, index pages and tracking junk don't make a URL different."""
-    path = re.sub(r"/(index\.(html?|php))?$", "", urlsplit(url).path).lower()
     query = query_of(url)
-    return host_of(url) + path + ("?" + query if query else "")
+    return page_of(url) + ("?" + query if query else "")
 
 
 def is_root(url: str) -> bool:

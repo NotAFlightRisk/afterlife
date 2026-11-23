@@ -7,11 +7,12 @@ import html
 import ipaddress
 import re
 import socket
+import ssl
 import time
 import zlib
 from collections import defaultdict
 from typing import NamedTuple
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.robotparser import RobotFileParser
 
 import aiohttp
@@ -28,11 +29,18 @@ TIMEOUT = aiohttp.ClientTimeout(total=45, connect=10, sock_read=20)
 MAX_BODY, MAX_ROBOTS, MAX_HOPS, MAX_DELAY = 400_000, 500_000, 10, 120
 REDIRECTS = {301, 302, 303, 307, 308}
 GONE_DNS = {socket.EAI_NONAME, getattr(socket, "EAI_NODATA", -5)}
+SETTLED = {"dns", "private", "badurl"}
+MAX_REFRESH = 10
+WRAPPERS = [
+    ipaddress.ip_network(net)
+    for net in ("::/96", "::ffff:0:0:0/96", "64:ff9b::/96", "64:ff9b:1::/48")
+]
 
 META_REFRESH = re.compile(
-    r"""<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["']?\s*\d+\s*;\s*url=['"]?([^"'>\s]+)""",
+    r"""<meta[^>]+http-equiv=["']?refresh["']?[^>]+content=["']?\s*(\d+)\s*;\s*url=['"]?([^"'>\s]+)""",
     re.I,
 )
+NOSCRIPT = re.compile(r"<noscript.*?</noscript>", re.S | re.I)
 JS_SWAP = re.compile(
     r"""window\.location(?:\.href)?\s*=\s*window\.location\.href\.replace\(\s*['"]([^'"]+)['"]"""
     r"""\s*,\s*['"]([^'"]+)['"]"""
@@ -56,7 +64,25 @@ class NoAnswer(Exception):
 
 
 def is_public(ip: str) -> bool:
-    return ipaddress.ip_address(ip.split("%")[0]).is_global
+    """Global, and not an IPv6 wrapper round a private IPv4 (mapped, NAT64, 6to4, Teredo)."""
+    address = ipaddress.ip_address(ip.split("%")[0])
+    if address.version == 6:
+        inner = address.ipv4_mapped or address.sixtofour or (address.teredo or (None, None))[1]
+        if inner is None and any(address in net for net in WRAPPERS):
+            inner = ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
+        if inner is not None and not inner.is_global:
+            return False
+    return address.is_global
+
+
+def legacy_tls() -> ssl.SSLContext:
+    """What an old browser would still talk to: no verification, old TLS, old renegotiation."""
+    context = ssl.create_default_context()
+    context.check_hostname, context.verify_mode = False, ssl.CERT_NONE
+    context.minimum_version = ssl.TLSVersion.MINIMUM_SUPPORTED
+    context.options |= ssl.OP_LEGACY_SERVER_CONNECT
+    context.set_ciphers("DEFAULT:@SECLEVEL=0")
+    return context
 
 
 class PublicResolver(AbstractResolver):
@@ -118,16 +144,34 @@ def next_hop(url: str, status: int, location: str | None, text: str) -> str | No
     """Where this response sends us: a Location, a meta refresh, or a 404 page's JS swap."""
     if status in REDIRECTS and location:
         return urljoin(url, location.strip())
-    head = text[:5000]
+    head = NOSCRIPT.sub("", text[:5000])
     swap = JS_SWAP.search(head)
     if swap and status in (404, 410) and len(text) < 3000:
         return url.replace(swap.group(1), swap.group(2), 1)
     refresh = META_REFRESH.search(head)
-    if refresh and status in (200, 404, 410):
-        target = urljoin(url, html.unescape(refresh.group(1)))
+    if refresh and status in (200, 404, 410) and int(refresh.group(1)) <= MAX_REFRESH:
+        target = urljoin(url, html.unescape(refresh.group(2)))
         if norm(target) != norm(url):
             return target
     return None
+
+
+def made_up(url: str) -> str:
+    """A sibling of this page that can't exist: same folder, or same query keys, nonsense values."""
+    parts = urlsplit(url)
+    token = f"hn-afterlife-{zlib.crc32(url.encode())}"
+    if parts.query:
+        pairs = parse_qsl(parts.query, keep_blank_values=True)
+        query = urlencode([(key, token) for key, _ in pairs])
+        return urlunsplit((parts.scheme, parts.netloc, parts.path, query, ""))
+    folder = parts.path.rsplit("/", 1)[0]
+    return urlunsplit((parts.scheme, parts.netloc, f"{folder}/{token}", "", ""))
+
+
+def probe_key(url: str) -> tuple:
+    parts = urlsplit(url)
+    keys = tuple(sorted(key for key, _ in parse_qsl(parts.query, keep_blank_values=True)))
+    return parts.hostname, parts.path if keys else parts.path.rsplit("/", 1)[0], keys
 
 
 async def read_capped(response: aiohttp.ClientResponse, limit: int) -> bytes:
@@ -148,6 +192,9 @@ def retry_after(value: str | None) -> float:
         return min(max(float(value or 30), 30), 300)
     except ValueError:
         return 60
+
+
+LEGACY_TLS = legacy_tls()
 
 
 class Gate:
@@ -176,10 +223,11 @@ class Fetcher:
         self.gates: dict[str, Gate] = {}
         self.dns: dict[str, str] = {}
         self.robots: dict[str, RobotFileParser | str] = {}
-        self.probes: dict[str, tuple[int, str]] = {}
+        self.probes: dict[tuple, tuple[int, str]] = {}
 
     def gate(self, host: str) -> Gate:
-        key = site(host)
+        """Each site shares one gate, bar a host that asked for its own crawl-delay."""
+        key = host if host in self.gates else site(host)
         if key not in self.gates:
             self.gates[key] = Gate(self.gap)
         return self.gates[key]
@@ -194,13 +242,15 @@ class Fetcher:
                 found = await loop.getaddrinfo(ascii_host, 443, type=socket.SOCK_STREAM)
                 self.dns[host] = "" if any(is_public(f[4][0]) for f in found) else "private"
             except socket.gaierror as e:
-                self.dns[host] = "dns" if e.errno in GONE_DNS else "dns-temp"
+                if e.errno not in GONE_DNS:
+                    return "dns-temp"
+                self.dns[host] = "dns"
             except ValueError:
                 self.dns[host] = "dns"
         return self.dns[host]
 
     async def send(
-        self, url: str, limit: int, any_type=False, verify=True, cookies: dict | None = None
+        self, url: str, limit: int, any_type=False, tls=None, cookies: dict | None = None
     ) -> Reply:
         """One polite GET, no redirects followed."""
         gate = self.gate(urlsplit(url).hostname or "")
@@ -212,7 +262,7 @@ class Fetcher:
                     headers=HEADERS,
                     allow_redirects=False,
                     timeout=TIMEOUT,
-                    ssl=None if verify else False,
+                    ssl=tls,
                     cookies=cookies,
                 ) as r,
             ):
@@ -223,26 +273,28 @@ class Fetcher:
                     gate.hold(retry_after(r.headers.get("retry-after")))
                 jar = {name: morsel.value for name, morsel in r.cookies.items()}
                 return Reply(r.status, r.headers.get("location"), is_html, text, jar)
-        except aiohttp.ClientConnectorCertificateError:
-            if not verify:
+        except aiohttp.ClientSSLError:
+            if tls is not None:
                 raise NoAnswer("tls") from None
-            return await self.send(url, limit, any_type, False, cookies)
+            return await self.send(url, limit, any_type, LEGACY_TLS, cookies)
         except (TimeoutError, aiohttp.ClientError, OSError, ValueError) as e:
             raise NoAnswer(kind_of(e)) from e
 
     async def allowed(self, url: str) -> str:
         """'' if robots.txt lets us fetch this, else why not."""
         key = urlsplit(url).netloc.lower()
-        if key not in self.robots:
+        rules = self.robots.get(key)
+        if rules is None:
             if len(self.robots) > 5000:
                 self.robots.clear()
-            self.robots[key] = await self.load_robots(urlsplit(url).scheme + "://" + key)
-        rules = self.robots[key]
+            rules = await self.load_robots(urlsplit(url).scheme + "://" + key)
+            if not isinstance(rules, str) or rules in SETTLED:
+                self.robots[key] = rules
+            if not isinstance(rules, str) and (delay := rules.crawl_delay(AGENT)):
+                host = urlsplit(url).hostname or ""
+                self.gates[host] = Gate(max(self.gap, min(float(delay), MAX_DELAY)))
         if isinstance(rules, str):
             return rules
-        if delay := rules.crawl_delay(AGENT):
-            gate = self.gate(urlsplit(url).hostname or "")
-            gate.gap = max(gate.gap, min(float(delay), MAX_DELAY))
         return "" if rules.can_fetch(AGENT, url) else "robots"
 
     async def load_robots(self, base: str) -> RobotFileParser | str:
@@ -268,10 +320,14 @@ class Fetcher:
     async def get(self, url: str) -> Seen:
         """Follow a URL to wherever it ends up, each hop polite to its own host. Cookies only
         last the one chain, so a site's cookie check can pass without us keeping anything."""
-        current, hops, jars = url, 0, defaultdict(dict)
+        current, hops, gone, jars = url, 0, 0, defaultdict(dict)
         for _ in range(MAX_HOPS):
-            parts = urlsplit(current)
-            if parts.scheme not in ("http", "https") or not parts.hostname:
+            try:
+                parts = urlsplit(current)
+                usable = parts.scheme in ("http", "https") and parts.hostname
+            except ValueError:
+                usable = False
+            if not usable:
                 return Seen(current, hops=hops, error="badurl")
             problem = await self.lookup(parts.hostname) or await self.allowed(current)
             if problem:
@@ -289,19 +345,28 @@ class Fetcher:
             if target is None:
                 text = reply.text
                 return Seen(
-                    current, reply.status, hops, reply.html, title_of(text), is_parked(text)
+                    current,
+                    reply.status,
+                    hops,
+                    reply.html,
+                    title_of(text),
+                    is_parked(text),
+                    gone=gone,
                 )
+            if reply.status in (404, 410):
+                gone = reply.status
             current, hops = target, hops + 1
         return Seen(current, hops=hops, error="loop")
 
     async def probe(self, url: str) -> tuple[int, str]:
-        """Status and title of a path that can't exist on this host, asked once per host."""
-        host = urlsplit(url).hostname or ""
-        if host not in self.probes:
-            made_up = f"{urlsplit(url).scheme}://{host}/hn-afterlife-{zlib.crc32(host.encode())}"
-            seen = await self.get(made_up)
-            self.probes[host] = (seen.status, seen.title)
-        return self.probes[host]
+        """Status and title of a sibling page that can't exist, asked once per folder."""
+        key = probe_key(url)
+        if key not in self.probes:
+            if len(self.probes) > 20_000:
+                self.probes.clear()
+            seen = await self.get(made_up(url))
+            self.probes[key] = (seen.status, seen.title)
+        return self.probes[key]
 
 
 def session() -> aiohttp.ClientSession:

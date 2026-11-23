@@ -16,7 +16,7 @@ from .net import Fetcher, NoAnswer, session
 from .urls import host_of, is_root, origin, site
 
 RECHECK_AFTER = 6.5 * 86_400
-TRY_AGAIN = ("noanswer", "badreply", "error")
+TRY_AGAIN = ("noanswer", "badreply", "error", "robots-error", "tls", "wall-429")
 STREAK_LIMIT = 5
 FATES = (ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE)
 log = logging.getLogger(__name__)
@@ -54,6 +54,7 @@ def result(url: str, title: str, seen: Seen, before: str | None) -> dict:
         "parked": seen.parked,
         "html": seen.html,
         "probe": seen.probe,
+        "gone": seen.gone,
         "then": fate == ALIVE and wants_then(url, title, seen),
     }
     return {
@@ -71,11 +72,11 @@ async def check(fetcher: Fetcher, github: known.GitHub | None, story: sqlite3.Ro
     try:
         if settled := await known.check(fetcher, github, url):
             return settled
-    except NoAnswer:
-        pass
+    except NoAnswer as failure:
+        return result(url, title, Seen(url, error=failure.kind), story["before"])
     seen = await fetcher.get(url)
     if seen.error == "reset":
-        home = seen if is_root(url) else await fetcher.get(origin(url) + "/")
+        home = seen if is_root(seen.url) else await fetcher.get(origin(seen.url) + "/")
         if home.error != "reset":
             seen = replace(seen, error="conn")
     if wants_probe(url, title, seen):
@@ -105,13 +106,16 @@ class Tally:
 
 
 async def crawl_site(fetcher, github, stories: list[sqlite3.Row], tally: Tally):
-    """One site's stories in turn. A host that fails five times running gets left alone."""
+    """One site's stories in turn. A host that fails five times running gets left alone: the
+    rest of its stories count as not answering, or wait for the next run if it was rate limiting."""
     streak, last_status = Counter(), {}
     for story in stories:
         url, host = story["url"], host_of(story["url"])
         if streak[host] >= STREAK_LIMIT:
             status = last_status[host]
-            seen = Seen(url, status, error="" if status else "conn")
+            if status == 429:
+                continue
+            seen = Seen(url, error="conn")
             outcome = result(url, story["title"], seen, story["before"])
             outcome["detail"] = {"skipped": True}
             tally.add(story, outcome)

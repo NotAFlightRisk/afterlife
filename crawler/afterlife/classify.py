@@ -8,11 +8,18 @@ import re
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 
-from .urls import host_of, is_root, norm, query_of, site
+from .urls import host_of, is_root, norm, page_of, pairs_of, query_of, site
 
 ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE = "alive", "moved", "dead", "elsewhere", "unsure"
-NO_ANSWER = {"refused", "timeout", "tls", "conn", "dns-temp"}
+NO_ANSWER = {"refused", "timeout", "conn", "dns-temp"}
 WALLS = {401, 402, 403, 429, 451, 999}
+LISTING = re.compile(
+    r"/(tags?|categor(y|ies)|topics?|archives?|search|sections?|labels?)(/|$)", re.I
+)
+LOGIN = re.compile(r"/(sign-?in|log-?in|authwall|servicelogin|session/new|users/sign_in)\b", re.I)
+NOT_FOUND = re.compile(
+    r"\b(404|not found|no longer (available|exists)|(does not|doesn't) exist|page missing)\b", re.I
+)
 
 STOP = set(
     "the a an and or of to in on for with from by at is are was be how why what your you our we"
@@ -76,6 +83,7 @@ class Seen:
     parked: bool = False
     error: str = ""
     probe: tuple[int, str] | None = None
+    gone: int = 0
 
 
 def tokens(text: str) -> set[str]:
@@ -122,10 +130,11 @@ def slug_match(url: str, final: str, hn_title: str) -> bool:
 
 
 def is_listing(url: str, final: str) -> bool:
-    """A home page, a section index, or a parent folder of where the story used to be."""
+    """A home page, a section or tag index, or a parent folder of where the story used to be."""
     old, new = urlsplit(url).path.rstrip("/"), urlsplit(final).path.rstrip("/")
-    parent = bool(new) and old.startswith(new) and len(new) < len(old)
-    return is_root(final) or parent or new.lower() in ("/blog", "/news", "/articles", "/posts")
+    parent = bool(new) and old.startswith(new + "/")
+    section = new.lower() in ("/blog", "/news", "/articles", "/posts") or LISTING.search(new)
+    return is_root(final) or parent or bool(section)
 
 
 def is_parked(text: str) -> bool:
@@ -134,7 +143,19 @@ def is_parked(text: str) -> bool:
 
 
 def same_page(url: str, seen: Seen) -> bool:
-    return norm(seen.url) == norm(url)
+    """Same page, even if the site tacked a session or consent bit onto the query."""
+    if norm(seen.url) == norm(url):
+        return True
+    return page_of(seen.url) == page_of(url) and pairs_of(url) <= pairs_of(seen.url)
+
+
+def is_login(url: str, seen: Seen) -> bool:
+    if same_page(url, seen):
+        return False
+    host = host_of(seen.url)
+    return host.startswith(("accounts.", "login.", "auth.", "signin.", "sso.")) or bool(
+        LOGIN.search(urlsplit(seen.url).path)
+    )
 
 
 def is_consent(url: str, seen: Seen) -> bool:
@@ -191,20 +212,23 @@ def classify(url: str, hn_title: str, seen: Seen, before: str = "") -> tuple[str
         return UNSURE, f"wall-{status}"
     if is_challenge(url, hn_title, seen):
         return UNSURE, "challenge"
+    if is_login(url, seen):
+        return UNSURE, "login"
     if seen.parked and not overlap(hn_title, title, hosts):
         return ELSEWHERE, "parked"
     if status in (404, 410):
         return DEAD, str(status)
     if not 200 <= status < 300:
         return UNSURE, f"status-{status}"
+    if NOT_FOUND.search(title) and not overlap(hn_title, title):
+        return (DEAD, str(seen.gone)) if seen.gone else (UNSURE, "soft404")
     if same_page(url, seen):
         if seen.probe == (200, title) and wants_probe(url, hn_title, seen):
             return UNSURE, "soft404"
         return ALIVE, "alive"
-    if (overlap(hn_title, title, hosts) or slug_match(url, seen.url, hn_title)) and not is_root(
-        seen.url
-    ):
+    listing = is_listing(url, seen.url)
+    if not listing and (overlap(hn_title, title, hosts) or slug_match(url, seen.url, hn_title)):
         return MOVED, "moved"
-    if is_listing(url, seen.url):
-        return ELSEWHERE, "home"
-    return ELSEWHERE, "unrelated"
+    if seen.gone:
+        return DEAD, str(seen.gone)
+    return ELSEWHERE, "home" if listing else "unrelated"

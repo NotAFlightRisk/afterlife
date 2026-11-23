@@ -16,7 +16,7 @@ GITHUB = re.compile(
 )
 YOUTUBE = re.compile(
     r"https?://(?:(?:www|m)\.)?(?:youtube\.com/(?:watch\?(?:.*&)?v=|embed/|shorts/|v/)|youtu\.be/)"
-    r"([\w-]{11})",
+    r"(?!videoseries)([\w-]{11})",
     re.I,
 )
 TWEET = re.compile(
@@ -98,11 +98,16 @@ class GitHub:
 
 async def oembed(
     fetcher: Fetcher, endpoint: str, target: str, moved_to: str = "", gone=(404,)
-) -> dict | None:
-    """A video or post through its oEmbed endpoint. None if the endpoint won't say."""
+) -> dict:
+    """A video or post through its oEmbed endpoint. Their pages need JavaScript, so this is the
+    only answer worth having, and a rate limit gets waited out rather than guessed round."""
     gate = fetcher.gate(endpoint.split("/")[2])
     query = urlencode({"format": "json", "url": target})
-    status, data, _ = await get_json(fetcher, gate, f"{endpoint}?{query}")
+    for _ in range(3):
+        status, data, headers = await get_json(fetcher, gate, f"{endpoint}?{query}")
+        if status != 429:
+            break
+        gate.hold(retry_after(headers.get("retry-after")))
     detail = {"via": "oembed"}
     if status == 200:
         fate = MOVED if moved_to else ALIVE
@@ -118,7 +123,8 @@ async def oembed(
         return {"fate": DEAD, "evidence": "404", "status": status, "detail": detail}
     if status in (401, 403):
         return {"fate": UNSURE, "evidence": "private", "status": status, "detail": detail}
-    return None
+    evidence = "wall-429" if status == 429 else f"status-{status}"
+    return {"fate": UNSURE, "evidence": evidence, "status": status, "detail": detail}
 
 
 async def check(fetcher: Fetcher, github: GitHub | None, url: str) -> dict | None:

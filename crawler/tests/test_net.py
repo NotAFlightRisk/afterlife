@@ -3,7 +3,7 @@ import errno
 
 import pytest
 
-from afterlife.net import PublicResolver, decode, kind_of, next_hop, title_of
+from afterlife.net import PublicResolver, decode, is_public, kind_of, made_up, next_hop, title_of
 from afterlife.urls import is_root, norm, site
 
 URL = "https://zverovich.net/2016/05/13/giving-up-on-julia.html"
@@ -87,3 +87,34 @@ def test_connection_failures_boil_down_to_kinds():
     assert kind_of(ConnectionRefusedError(errno.ECONNREFUSED, "no")) == "refused"
     assert kind_of(ConnectionResetError(errno.ECONNRESET, "rst")) == "reset"
     assert kind_of(TimeoutError()) == "timeout"
+
+
+def test_a_slow_refresh_is_a_reload_not_a_redirect():
+    page = '<meta http-equiv="refresh" content="1800; url=/">'
+    assert next_hop(URL, 200, None, page) is None
+
+
+def test_a_refresh_for_browsers_without_javascript_is_ignored():
+    page = '<noscript><meta http-equiv="refresh" content="0; url=/nojs"></noscript>'
+    assert next_hop(URL, 200, None, page) is None
+
+
+def test_the_probe_asks_for_a_sibling_that_cant_exist():
+    assert made_up("https://example.com/news/article.php?id=12345").startswith(
+        "https://example.com/news/article.php?id=hn-afterlife-"
+    )
+    assert made_up("https://example.com/posts/my-post").startswith(
+        "https://example.com/posts/hn-afterlife-"
+    )
+
+
+@pytest.mark.parametrize(
+    "ip",
+    ["::127.0.0.1", "::ffff:0:127.0.0.1", "64:ff9b::7f00:1", "::ffff:10.0.0.1", "2002:7f00:1::"],
+)
+def test_private_ipv4_wrapped_in_ipv6_is_refused(ip):
+    assert not is_public(ip)
+
+
+def test_a_real_ipv6_address_is_public():
+    assert is_public("2606:4700:4700::1111")
