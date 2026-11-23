@@ -60,7 +60,7 @@ uv run --project crawler afterlife stats
 
 `wayback` then asks the [Wayback Machine](https://web.archive.org/) about two kinds of link, at the 15 or so a minute it allows. Home pages that no longer look like the story get compared with their capture from around the day they were posted, and links behind a wall get the newest capture that isn't one. That's a couple of days for the lot. `run` does `stories`, `crawl` and `wayback` in one go.
 
-The tests are `uv run --project crawler pytest`, and lint is `uv run --project crawler ruff check`.
+If you change how links get sorted, `reclassify` re-runs the rules over every check that's already stored, so there's no need to crawl again. The tests are `uv run --project crawler pytest`, and lint is `uv run --project crawler ruff check`.
 
 ---
 
