@@ -5,7 +5,7 @@
   import StoryCard from '#lib/components/StoryCard.svelte';
   import YearGrid from '#lib/components/YearGrid.svelte';
   import { fateOf, loadCard, type Card, type Dot } from '#lib/data.ts';
-  import { FATES } from '#lib/fates.ts';
+  import { STACKED } from '#lib/fates.ts';
   import { count, date, inTen, plural } from '#lib/format.ts';
 
   let { data } = $props();
@@ -26,7 +26,7 @@
   ];
   const years = $derived(Object.entries(data.stats.years));
   const totals = $derived(
-    FATES.map((fate) => [fate, years.reduce((sum, [, counts]) => sum + counts[fate], 0)] as const)
+    STACKED.map((fate) => [fate, years.reduce((sum, [, counts]) => sum + counts[fate], 0)] as const)
   );
   const checked = $derived(totals.reduce((sum, [, n]) => sum + n, 0));
   const [first, oldest] = $derived(years[0]);

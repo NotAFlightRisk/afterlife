@@ -1,6 +1,6 @@
 <script lang="ts">
   import Fate from '#lib/components/Fate.svelte';
-  import { FATES } from '#lib/fates.ts';
+  import { STACKED } from '#lib/fates.ts';
   import { count, date, percent } from '#lib/format.ts';
 
   let { data } = $props();
@@ -69,7 +69,7 @@
         <tr>
           <th scope="col">posted</th>
           <th scope="col">links</th>
-          {#each FATES as fate (fate)}<th scope="col"><Fate {fate} /></th>{/each}
+          {#each STACKED as fate (fate)}<th scope="col"><Fate {fate} /></th>{/each}
           <th scope="col">dead</th>
         </tr>
       </thead>
@@ -78,7 +78,7 @@
           <tr>
             <th scope="row">{year}</th>
             <td>{count(total)}</td>
-            {#each FATES as fate (fate)}<td>{count(counts[fate])}</td>{/each}
+            {#each STACKED as fate (fate)}<td>{count(counts[fate])}</td>{/each}
             <td>{percent(counts.dead, total)}</td>
           </tr>
         {/each}

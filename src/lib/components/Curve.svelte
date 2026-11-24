@@ -1,14 +1,11 @@
 <script lang="ts">
   import Fate from '#lib/components/Fate.svelte';
-  import type { Fate as FateName } from '#lib/fates.ts';
+  import { STACKED, type Fate as FateName } from '#lib/fates.ts';
   import { count, percent } from '#lib/format.ts';
 
   let { years }: { years: [string, Record<FateName, number>][] } = $props();
 
-  // bottom to top, the way the grid stacks its dots
-  const STACK: FateName[] = ['dead', 'elsewhere', 'unsure', 'moved', 'alive'];
   const BROKEN: FateName[] = ['dead', 'elsewhere'];
-  const ROWS = [...STACK].reverse();
   const TICKS = [25, 50, 75];
 
   let all = $state(false);
@@ -26,7 +23,7 @@
   const bands = $derived.by(() => {
     const under = years.map(() => 0);
     const edge = () => under.map((share, index) => `${x(index)}% ${y(share)}%`);
-    return STACK.map((fate) => {
+    return [...STACKED].reverse().map((fate) => {
       const bottom = edge().reverse();
       if (all || BROKEN.includes(fate)) {
         years.forEach(([, counts], index) => (under[index] += counts[fate] / totals[index]));
@@ -100,7 +97,7 @@
       <p><strong>{year}</strong> <span>| {count(total)} links</span></p>
       <table>
         <tbody>
-          {#each ROWS as fate (fate)}
+          {#each STACKED as fate (fate)}
             <tr>
               <td><Fate {fate} /></td>
               <td>{count(counts[fate])}</td>

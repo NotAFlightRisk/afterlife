@@ -9,6 +9,9 @@ export const LABELS: Record<Fate, string> = {
   unsure: "can't tell"
 };
 
+/** Top to bottom, as the charts stack them */
+export const STACKED: Fate[] = ['alive', 'moved', 'unsure', 'elsewhere', 'dead'];
+
 /** Alive and moved links still load the story */
 export const works = (fate?: Fate) => fate === 'alive' || fate === 'moved';
 
