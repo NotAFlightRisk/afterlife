@@ -40,7 +40,7 @@ class Wayback:
                         self.gate.hold(retry_after(r.headers.get("retry-after")))
                         continue
                     return r.status, decode(await r.read(), r.charset)
-            except aiohttp.ClientResponseError:
+            except (aiohttp.ClientResponseError, aiohttp.ClientPayloadError):
                 log.warning("Wayback can't serve %s cleanly, so it counts as no capture", url)
                 return 0, ""
             except (TimeoutError, aiohttp.ClientError, OSError) as e:

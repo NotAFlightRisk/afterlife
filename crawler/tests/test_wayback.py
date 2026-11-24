@@ -2,6 +2,7 @@ import asyncio
 import time
 
 import aiohttp
+import pytest
 
 from afterlife import wayback
 from afterlife.db import connect, save_check, save_stories
@@ -11,10 +12,14 @@ from afterlife.wayback import Wayback, changed, due, save_capture
 URL = "https://straight2spam.xyz/"
 
 
-def test_a_capture_wayback_cant_serve_is_no_capture_not_an_outage():
+@pytest.mark.parametrize(
+    "garbled",
+    [aiohttp.ClientResponseError(None, ()), aiohttp.ClientPayloadError("says gzip, isn't")],
+)
+def test_a_capture_wayback_cant_serve_is_no_capture_not_an_outage(garbled):
     class Garbled:
         def get(self, *args, **kwargs):
-            raise aiohttp.ClientResponseError(None, ())
+            raise garbled
 
     assert asyncio.run(Wayback(Garbled()).then("https://koreader.rocks/", 0)) is None
 
