@@ -6,8 +6,8 @@
   let { data } = $props();
 
   const LISTS = [
-    { id: 'upvoted', label: 'most upvoted dead links' },
-    { id: 'hosts', label: 'domains that took the most with them' },
+    { id: 'upvoted', label: 'dead links' },
+    { id: 'hosts', label: 'domains' },
     { id: 'launches', label: 'Show HN cemetery' }
   ] as const;
 
@@ -43,12 +43,12 @@
   </div>
 
   {#if shown === 'upvoted'}
-    <p>The biggest stories whose links are dead now. Each one goes to its Wayback copy.</p>
+    <p>The most upvoted stories whose links are dead now. Each one goes to its Wayback copy.</p>
     <StoryRows stories={stories(data.upvoted)} dated />
   {:else if shown === 'hosts'}
     <p>
-      Sites with the most HN stories that are dead or land somewhere else now. Some are shut, some
-      just moved everything without redirects.
+      The domains that took the most HN history with them: their stories are dead or land somewhere
+      else now. Some are shut, some just moved everything without redirects.
     </p>
     <table>
       <thead>
@@ -125,8 +125,7 @@
   }
 
   table {
-    inline-size: max-content;
-    max-inline-size: 100%;
+    justify-self: start;
     font-size: var(--size-s);
 
     th,
