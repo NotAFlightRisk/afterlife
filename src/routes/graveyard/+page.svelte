@@ -55,7 +55,7 @@
         <tr>
           <th scope="col">domain</th>
           <th scope="col">dead</th>
-          <th scope="col">lands elsewhere</th>
+          <th scope="col">elsewhere</th>
           <th scope="col">stories</th>
           <th scope="col">gone</th>
         </tr>
@@ -63,7 +63,12 @@
       <tbody>
         {#each data.hosts as host (host)}
           <tr>
-            <th scope="row"><a href="/domain/{host.host}">{host.host}</a></th>
+            <th scope="row">
+              <a href="/domain/{host.host}">
+                {#each host.host.split('.') as label, index (index)}{#if index}.<wbr
+                    />{/if}{label}{/each}
+              </a>
+            </th>
             <td>{count(host.dead)}</td>
             <td>{count(host.elsewhere)}</td>
             <td>{count(host.stories)}</td>
@@ -96,27 +101,32 @@
   .switch {
     display: flex;
     flex-wrap: wrap;
-    gap: var(--space-2);
 
     button {
-      padding: 0.2rem 0.5rem;
-      border: 1px solid var(--rule);
+      padding: 0;
+      border: 0;
       background: none;
       cursor: pointer;
 
-      &[aria-pressed='true'] {
-        border-color: var(--fate-dead);
-        background: var(--fate-dead);
-        color: var(--surface);
+      &:not(:first-child)::before {
+        content: '|';
+        padding-inline: 0.4em;
+        color: var(--text-muted);
       }
 
-      &:hover:not([aria-pressed='true']) {
-        border-color: var(--fate-elsewhere);
+      &[aria-pressed='true'] {
+        font-weight: bold;
+      }
+
+      &:hover {
+        text-decoration: underline;
       }
     }
   }
 
   table {
+    inline-size: max-content;
+    max-inline-size: 100%;
     font-size: var(--size-s);
 
     th,
@@ -128,7 +138,6 @@
     :is(th[scope='row'], th:first-child) {
       text-align: start;
       font-weight: normal;
-      overflow-wrap: anywhere;
     }
 
     thead th {

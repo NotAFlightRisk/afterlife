@@ -24,13 +24,23 @@ export function plural(n: number, one: string, many = `${one}s`) {
   return `${count(n)} ${n === 1 ? one : many}`;
 }
 
-/** The same day a few years back, with 29 Feb landing on the 28th */
-export function yearsBefore(day: string, years: number) {
-  const [year, month, dayOfMonth] = day.split('-').map(Number);
-  const then = new Date(Date.UTC(year - years, month - 1, dayOfMonth));
-  if (then.getUTCMonth() !== month - 1) then.setUTCDate(0);
-  return then.toISOString().slice(0, 10);
+export interface Step {
+  days?: number;
+  months?: number;
+  years?: number;
 }
+
+/** A day moved by some days, months or years, keeping to the end of a shorter month */
+export function shift(day: string, { days = 0, months = 0, years = 0 }: Step) {
+  const [year, month, dayOfMonth] = day.split('-').map(Number);
+  const moved = new Date(Date.UTC(year + years, month - 1 + months, 1));
+  const last = new Date(Date.UTC(moved.getUTCFullYear(), moved.getUTCMonth() + 1, 0));
+  moved.setUTCDate(Math.min(dayOfMonth, last.getUTCDate()) + days);
+  return moved.toISOString().slice(0, 10);
+}
+
+/** The same day a few years back, with 29 Feb landing on the 28th */
+export const yearsBefore = (day: string, years: number) => shift(day, { years: -years });
 
 export function today() {
   const now = new Date();

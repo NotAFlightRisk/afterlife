@@ -4,7 +4,7 @@
   import StoryRows from '#lib/components/StoryRows.svelte';
   import { loadDay, type Card } from '#lib/data.ts';
   import { works } from '#lib/fates.ts';
-  import { date, today, yearsBefore } from '#lib/format.ts';
+  import { date, shift, today, yearsBefore, type Step } from '#lib/format.ts';
 
   let { data } = $props();
 
@@ -50,6 +50,11 @@
   />
 </svelte:head>
 
+{#snippet step(label: string, by: Step)}
+  {@const day = shift(picked ?? latest, by)}
+  {#if day >= earliest && day <= latest}<a href="/day?d={day}">{label}</a>{:else}{label}{/if}
+{/snippet}
+
 <div class="day">
   <header>
     <h1>{picked ? `Hacker News on ${date(picked)}` : 'This day, 5, 10 and 15 years ago'}</h1>
@@ -58,6 +63,13 @@
       top 30 stories by points, which is close but not quite it. Dead links go to their Wayback copy
       instead.
     </p>
+    {#if picked}
+      <p class="step">
+        Go back a {@render step('day', { days: -1 })}, {@render step('month', { months: -1 })} or
+        {@render step('year', { years: -1 })}. Go forward a {@render step('day', { days: 1 })},
+        {@render step('month', { months: 1 })} or {@render step('year', { years: 1 })}.
+      </p>
+    {/if}
     <form method="GET" action="/day">
       <label for="day">Any other day</label>
       <input id="day" name="d" type="date" min={earliest} max={latest} value={picked} required />
@@ -151,6 +163,10 @@
         font-weight: normal;
       }
     }
+  }
+
+  .step a {
+    text-decoration: underline;
   }
 
   .still {

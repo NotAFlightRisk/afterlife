@@ -54,7 +54,7 @@
   </div>
   <figcaption>
     <span>{first.year}</span>
-    <span>dead, and lands elsewhere on top, by the year it was posted</span>
+    <span>dead, with lands elsewhere on top, by year posted</span>
     <span>{last.year}</span>
   </figcaption>
 </figure>
@@ -105,10 +105,18 @@
 
   figcaption {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
-    gap: var(--space-2);
+    gap: 0 var(--space-2);
     color: var(--text-muted);
     font-size: var(--size-xs);
     text-align: center;
+
+    @media (max-width: 40rem) {
+      span:nth-child(2) {
+        order: 1;
+        flex-basis: 100%;
+      }
+    }
   }
 </style>

@@ -180,7 +180,7 @@
     z-index: 1;
     display: grid;
     grid-template-columns: repeat(12, 1fr);
-    gap: 6px;
+    gap: var(--month-gap);
     margin-inline-start: calc(var(--label) + var(--space-4));
     padding-block: var(--space-1);
     background: var(--surface);
@@ -242,7 +242,7 @@
   @media (max-width: 40rem) {
     .months {
       margin-inline-start: 0;
-      font-size: 0.5625rem;
+      font-size: var(--size-2xs);
     }
 
     .panel {

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Card } from '../src/lib/data.ts';
 import { feed } from '../src/lib/feed.ts';
-import { yearsBefore } from '../src/lib/format.ts';
+import { shift, yearsBefore } from '../src/lib/format.ts';
 
 const story = (title: string, fate: Card['fate']): Card => ({
   id: 1,
@@ -48,5 +48,14 @@ describe('feed around a leap day', () => {
   it('gives 28 and 29 February one item between them in a year without a 29th', async () => {
     const xml = await feed('2028-03-01', async (day) => ({ stories: [story(day, 'alive')] }));
     expect(xml.match(/<guid[^>]*>[^<]*d=2018-02-28</g)).toHaveLength(1);
+  });
+});
+
+describe('shift', () => {
+  it('steps by days, months and years like HN does, keeping to the end of a short month', () => {
+    expect(shift('2016-01-31', { months: 1 })).toBe('2016-02-29');
+    expect(shift('2016-03-01', { days: -1 })).toBe('2016-02-29');
+    expect(shift('2016-12-31', { days: 1 })).toBe('2017-01-01');
+    expect(shift('2016-02-29', { years: 1 })).toBe('2017-02-28');
   });
 });

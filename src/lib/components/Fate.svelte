@@ -20,7 +20,7 @@
       inline-size: 0.7em;
       block-size: 0.7em;
       background: var(--chip);
-      box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+      box-shadow: var(--chip-edge);
     }
   }
 

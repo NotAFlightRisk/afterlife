@@ -13,6 +13,7 @@
 
   let { year, counts, months: sizes, onhover, onpick }: Props = $props();
 
+  // keep in step with --month-gap, which lines the month names up over the columns
   const GAP = 6;
   // dead at the bottom of each month, then the murkier fates, then the ones that still work
   const STACK = [4, 3, 0, 1, 2];
