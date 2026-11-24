@@ -59,7 +59,7 @@ class Algolia:
 def story(hit: dict) -> dict:
     return {
         "id": int(hit["objectID"]),
-        "url": hit.get("url") or None,
+        "url": (hit.get("url") or "").strip() or None,
         "title": hit.get("title") or "",
         "points": hit.get("points") or 0,
         "comments": hit.get("num_comments") or 0,
