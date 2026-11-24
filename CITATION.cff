@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: If you use this data, please cite it as below.
+type: dataset
+title: Hacker Afterlife
+abstract: >-
+  Every link that made Hacker News since 2007 (100 or more points, plus each
+  day's top 30), checked to see which still work, which moved and which died.
+authors:
+  - name: NotAFlightRisk
+url: https://afterlife.peng.ly
+repository-code: https://github.com/NotAFlightRisk/afterlife
+license: CC-BY-4.0
+keywords:
+  - hacker-news
+  - link-rot
+  - dead-links
+  - web-archiving
+  - open-data
