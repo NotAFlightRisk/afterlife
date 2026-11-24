@@ -130,9 +130,10 @@
     const { pitch, column, across, height } = layout;
     const area = canvas!.getBoundingClientRect();
     const x = event.clientX - area.left;
-    const month = Math.floor(x / (column + GAP));
-    // a click in the gap after a month counts as its nearest dot
-    const along = Math.min(Math.floor((x - month * (column + GAP)) / pitch), across - 1);
+    // a click in the gap between two months goes to whichever is nearer
+    const month = Math.floor((x + GAP / 2) / (column + GAP));
+    const into = Math.floor((x - month * (column + GAP)) / pitch);
+    const along = Math.max(0, Math.min(into, across - 1));
     const up = Math.ceil((height - (event.clientY - area.top)) / pitch) - 1;
     if (month < 0 || month > 11 || up < 0) return;
     return stacks[month][up * across + along];

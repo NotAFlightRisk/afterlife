@@ -9,7 +9,8 @@
     | { cards: Card[] }
     | { missing: 'story' }
     | { missing: 'link'; host: string; others: number }
-    | { missing: 'nonsense' };
+    | { missing: 'nonsense' }
+    | { missing: 'offline' };
 
   const BOOKMARKLET =
     "javascript:location.href='https://afterlife.peng.ly/lookup?q='+encodeURIComponent(location.href)";
@@ -37,7 +38,11 @@
   $effect(() => {
     answer = undefined;
     let current = true;
-    if (query) find(query).then((found) => current && (answer = found));
+    if (query) {
+      find(query)
+        .then((found) => current && (answer = found))
+        .catch(() => current && (answer = { missing: 'offline' }));
+    }
     return () => (current = false);
   });
 </script>
@@ -88,6 +93,8 @@
           <a href="/domain/{answer.host}">see how they're doing</a>.
         {/if}
       </p>
+    {:else if answer?.missing === 'offline'}
+      <p>We couldn't load our data just then. Have another go in a minute.</p>
     {:else if answer?.missing === 'nonsense'}
       <p>That doesn't look like a link or an HN thread. Try pasting the whole address.</p>
     {/if}
