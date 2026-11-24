@@ -63,7 +63,7 @@
   }
 
   $effect(() => {
-    if (!canvas || !dots || !width) return;
+    if (!canvas || !width) return;
     const { pitch, column, across, height } = layout;
     const ratio = devicePixelRatio || 1;
     canvas.width = Math.round(width * ratio);
@@ -71,9 +71,18 @@
     const context = canvas.getContext('2d')!;
     context.scale(ratio, ratio);
     const style = getComputedStyle(canvas);
+    const ground = style.getPropertyValue('--surface-sunk');
+    if (!dots) {
+      // each month's outline from the counts we already have, until its dots turn up
+      context.fillStyle = ground;
+      sizes.forEach((count, month) => {
+        const tall = Math.ceil(count / across) * pitch;
+        context.fillRect(month * (column + GAP), height - tall, across * pitch, tall);
+      });
+      return;
+    }
     const colours = FATES.map((fate) => style.getPropertyValue(`--fate-${fate}`));
     const lines = hatch(context, colours[4], ratio);
-    const ground = style.getPropertyValue('--surface-sunk');
     const size = pitch - (pitch > 2 ? 1 : 0.5);
     stacks.forEach((stack, month) => {
       stack.forEach((dot, place) => {
