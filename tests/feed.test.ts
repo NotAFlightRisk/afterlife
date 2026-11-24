@@ -43,3 +43,10 @@ describe('yearsBefore', () => {
     expect(yearsBefore('2024-02-29', 4)).toBe('2020-02-29');
   });
 });
+
+describe('feed around a leap day', () => {
+  it('gives 28 and 29 February one item between them in a year without a 29th', async () => {
+    const xml = await feed('2028-03-01', async (day) => ({ stories: [story(day, 'alive')] }));
+    expect(xml.match(/<guid[^>]*>[^<]*d=2018-02-28</g)).toHaveLength(1);
+  });
+});

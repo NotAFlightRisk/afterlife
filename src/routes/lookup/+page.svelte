@@ -36,7 +36,9 @@
 
   $effect(() => {
     answer = undefined;
-    if (query) find(query).then((found) => (answer = found));
+    let current = true;
+    if (query) find(query).then((found) => current && (answer = found));
+    return () => (current = false);
   });
 </script>
 

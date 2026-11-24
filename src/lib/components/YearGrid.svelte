@@ -123,7 +123,7 @@
     const x = event.clientX - area.left;
     const month = Math.floor(x / (column + GAP));
     const along = Math.floor((x - month * (column + GAP)) / pitch);
-    const up = Math.floor((height - (event.clientY - area.top)) / pitch);
+    const up = Math.ceil((height - (event.clientY - area.top)) / pitch) - 1;
     if (month < 0 || month > 11 || along >= across || up < 0) return;
     return stacks[month][up * across + along];
   }

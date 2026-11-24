@@ -32,8 +32,10 @@ export async function feed(today: string, load: (day: string) => Promise<Day | u
     return day.toISOString().slice(0, 10);
   });
   const items = await Promise.all(
-    days.map(async (day) => {
+    days.map(async (day, index) => {
       const then = yearsBefore(day, 10);
+      // 28 and 29 February both land on the 28th in a year without a 29th
+      if (days.slice(0, index).some((earlier) => yearsBefore(earlier, 10) === then)) return '';
       const stories = (await load(then))?.stories;
       return stories?.length ? item(day, then, stories) : '';
     })
