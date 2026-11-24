@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
+  import { page } from '$app/state';
   import StoryRows from '#lib/components/StoryRows.svelte';
   import { fateOf, type Row } from '#lib/data.ts';
   import { count, percent } from '#lib/format.ts';
@@ -12,6 +14,10 @@
   ] as const;
 
   let shown = $state<(typeof LISTS)[number]['id']>('upvoted');
+
+  onMount(() => {
+    shown = LISTS.find((list) => list.id === page.url.searchParams.get('show'))?.id ?? shown;
+  });
 
   const stories = (rows: Row[]) =>
     rows.map(([id, day, points, fate, title, url]) => ({
