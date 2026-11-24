@@ -18,8 +18,7 @@
   const x = (index: number) => (index / (years.length - 1)) * 100;
   const y = (share: number) => 100 - (share / top) * 100;
 
-  // clip-path polygons, top edge then bottom edge. Hidden bands lie flat on the broken ones,
-  // so switching views grows them in place
+  // hidden bands lie flat on the broken ones, so switching views grows them in place
   const bands = $derived.by(() => {
     const under = years.map(() => 0);
     const edge = () => under.map((share, index) => `${x(index)}% ${y(share)}%`);
@@ -61,7 +60,7 @@
 </script>
 
 <figure class="curve">
-  <div class="views" role="group" aria-label="What the chart shows">
+  <div class="switch views" role="group" aria-label="What the chart shows">
     <button type="button" aria-pressed={!all} onclick={() => (all = false)}>broken links</button>
     <button type="button" aria-pressed={all} onclick={() => (all = true)}>all links</button>
   </div>
@@ -130,34 +129,15 @@
   }
 
   .views {
-    display: flex;
     justify-self: end;
     font-size: var(--size-xs);
 
     button {
-      padding: 0;
-      border: 0;
-      background: none;
       color: var(--text-muted);
-      cursor: pointer;
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-
-    button + button::before {
-      content: '|';
-      content: '|' / '';
-      display: inline-block;
-      padding-inline: 0.4em;
-      color: var(--text-muted);
-      font-weight: normal;
     }
 
     [aria-pressed='true'] {
       color: var(--text);
-      font-weight: bold;
     }
   }
 

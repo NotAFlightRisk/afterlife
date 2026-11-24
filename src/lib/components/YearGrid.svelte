@@ -85,7 +85,7 @@
       return;
     }
     const colours = FATES.map((fate) => style.getPropertyValue(`--fate-${fate}`));
-    // a can't-tell dot is hatched in what the newest Wayback copy found: the page, a dead end, or no copy
+    // a can't-tell dot hatches in what Wayback last found there
     const [there, gone, unknown] = [0, 2, 4].map((fate) => hatch(context, colours[fate], ratio));
     const size = pitch - (pitch > 2 ? 1 : 0.5);
     stacks.forEach((stack, month) => {

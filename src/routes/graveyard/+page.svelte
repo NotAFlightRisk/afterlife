@@ -104,34 +104,6 @@
     font-size: var(--size-l);
   }
 
-  .switch {
-    display: flex;
-    flex-wrap: wrap;
-
-    button {
-      padding: 0;
-      border: 0;
-      background: none;
-      cursor: pointer;
-
-      &:not(:first-child)::before {
-        content: '|';
-        content: '|' / '';
-        display: inline-block;
-        padding-inline: 0.4em;
-        color: var(--text-muted);
-      }
-
-      &[aria-pressed='true'] {
-        font-weight: bold;
-      }
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
-  }
-
   table {
     justify-self: start;
     font-size: var(--size-s);
