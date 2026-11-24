@@ -20,6 +20,7 @@ from .net import HEADERS, TIMEOUT, Gate, NoAnswer, decode, kind_of, retry_after,
 from .urls import host_of
 
 AVAILABLE = "https://archive.org/wayback/available"
+OUTAGE_WAIT, PATIENCE = 15 * 60, 8
 CDX = "https://web.archive.org/cdx/search/cdx"
 log = logging.getLogger(__name__)
 
@@ -117,6 +118,17 @@ async def note_last_good(db: sqlite3.Connection, wayback: Wayback, story: sqlite
     save_capture(db, story["id"], "good", await wayback.last_good(story["url"]))
 
 
+async def patiently(look_up, db: sqlite3.Connection, wayback: Wayback, story: sqlite3.Row):
+    """A blip, ours or theirs, gets a few quarter-hour waits before the pass gives up."""
+    for _ in range(PATIENCE):
+        try:
+            return await look_up(db, wayback, story)
+        except NoAnswer:
+            log.warning("No answer from the Wayback Machine, trying again in %ds", OUTAGE_WAIT)
+            await asyncio.sleep(OUTAGE_WAIT)
+    await look_up(db, wayback, story)
+
+
 async def run(db: sqlite3.Connection, limit: int | None = None, minutes: int | None = None):
     homes = due(db, "then", "latest.fate = 'alive' and latest.detail like '%\"then\": true%'")
     walled = due(db, "good", "latest.fate = 'unsure' and latest.evidence != 'noanswer'")
@@ -130,7 +142,7 @@ async def run(db: sqlite3.Connection, limit: int | None = None, minutes: int | N
         try:
             async with asyncio.timeout(minutes * 60 if minutes else None):
                 for done, (look_up, story) in enumerate(lookups, 1):
-                    await look_up(db, wayback, story)
+                    await patiently(look_up, db, wayback, story)
                     db.commit()
                     if done % 500 == 0:
                         log.info("Wayback: %d of %d looked up", done, len(lookups))

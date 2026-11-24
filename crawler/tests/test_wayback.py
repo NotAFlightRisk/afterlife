@@ -5,6 +5,7 @@ import aiohttp
 
 from afterlife import wayback
 from afterlife.db import connect, save_check, save_stories
+from afterlife.net import NoAnswer
 from afterlife.wayback import Wayback, changed, due, save_capture
 
 URL = "https://straight2spam.xyz/"
@@ -80,3 +81,39 @@ def test_out_of_minutes_the_wayback_pass_keeps_what_it_found(tmp_path, monkeypat
     asyncio.run(wayback.run(db, minutes=1))
     found = connect(tmp_path / "afterlife.db").execute("select count(*) from captures").fetchone()
     assert 0 < found[0] < 5
+
+
+def walled_db(tmp_path):
+    db = connect(tmp_path / "afterlife.db")
+    story = {"title": "A story", "points": 100, "comments": 0, "posted": 0, "show_hn": 0}
+    save_stories(db, [{**story, "id": 1, "url": "https://site1.example/"}])
+    save_check(db, 1, 10, {"fate": "unsure", "evidence": "wall-403"})
+    return db
+
+
+def test_a_short_outage_is_waited_out(tmp_path, monkeypatch):
+    db, answers = walled_db(tmp_path), iter([NoAnswer("wayback"), NoAnswer("wayback"), None])
+
+    async def flaky(self, url):
+        if isinstance(answer := next(answers), NoAnswer):
+            raise answer
+        return ("20200101000000", 200)
+
+    monkeypatch.setattr(wayback, "OUTAGE_WAIT", 0)
+    monkeypatch.setattr(Wayback, "last_good", flaky)
+    asyncio.run(wayback.run(db))
+    assert db.execute("select count(*) from captures").fetchone()[0] == 1
+
+
+def test_a_long_outage_ends_the_pass_with_nothing_made_up(tmp_path, monkeypatch):
+    db, calls = walled_db(tmp_path), []
+
+    async def silent(self, url):
+        calls.append(url)
+        raise NoAnswer("wayback")
+
+    monkeypatch.setattr(wayback, "OUTAGE_WAIT", 0)
+    monkeypatch.setattr(Wayback, "last_good", silent)
+    asyncio.run(wayback.run(db))
+    assert len(calls) == wayback.PATIENCE + 1
+    assert db.execute("select count(*) from captures").fetchone()[0] == 0
