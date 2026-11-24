@@ -73,6 +73,7 @@
     > :not(:first-child)::before {
       content: '|';
       content: '|' / '';
+      display: inline-block;
       margin-inline-end: var(--space-2);
       color: var(--rule);
     }

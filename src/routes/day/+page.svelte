@@ -57,7 +57,9 @@
 
 <div class="day">
   <header>
-    <h1>{picked ? `Hacker News on ${date(picked)}` : 'This day, 5, 10 and 15 years ago'}</h1>
+    <h1 id="day-title">
+      {picked ? `Hacker News on ${date(picked)}` : 'This day, 5, 10 and 15 years ago'}
+    </h1>
     <p>
       Where we've got HN's own front page for a day, that's what you get. Otherwise it's that day's
       top 30 stories by points, which is close but not quite it. Dead links go to their Wayback copy
@@ -80,11 +82,10 @@
 
   <div class="columns" class:single={picked}>
     {#each columns as column (column.day)}
-      <section aria-labelledby="day-{column.day}">
-        <h2 id="day-{column.day}">
-          {column.ago ? `${column.ago} years ago` : date(column.day)}
-          {#if column.ago}<span>{date(column.day)}</span>{/if}
-        </h2>
+      <section aria-labelledby={column.ago ? `day-${column.day}` : 'day-title'}>
+        {#if column.ago}
+          <h2 id="day-{column.day}">{column.ago} years ago <span>{date(column.day)}</span></h2>
+        {/if}
         {#if !column.stories}
           <p class="quiet">Loading...</p>
         {:else if column.stories.length}
