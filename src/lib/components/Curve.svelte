@@ -1,15 +1,18 @@
 <script lang="ts">
-  import type { Fate } from '#lib/fates.ts';
-  import { percent } from '#lib/format.ts';
+  import Fate from '#lib/components/Fate.svelte';
+  import type { Fate as FateName } from '#lib/fates.ts';
+  import { count, percent } from '#lib/format.ts';
 
-  let { years }: { years: [string, Record<Fate, number>][] } = $props();
+  let { years }: { years: [string, Record<FateName, number>][] } = $props();
 
   // bottom to top, the way the grid stacks its dots
-  const STACK: Fate[] = ['dead', 'elsewhere', 'unsure', 'moved', 'alive'];
-  const BROKEN: Fate[] = ['dead', 'elsewhere'];
+  const STACK: FateName[] = ['dead', 'elsewhere', 'unsure', 'moved', 'alive'];
+  const BROKEN: FateName[] = ['dead', 'elsewhere'];
+  const ROWS = [...STACK].reverse();
   const TICKS = [25, 50, 75];
 
   let all = $state(false);
+  let hovered = $state<{ index: number; x: number; y: number }>();
   const top = $derived(all ? 1 : 0.5);
   const totals = $derived(
     years.map(([, counts]) => Object.values(counts).reduce((sum, n) => sum + n, 0))
@@ -51,6 +54,13 @@
       `sit on top, ${percent(oldest.elsewhere, totals[0])} more for ${from}.`
     );
   });
+
+  function hover(event: PointerEvent & { currentTarget: HTMLElement }) {
+    const area = event.currentTarget.getBoundingClientRect();
+    const along = (event.clientX - area.left) / area.width;
+    const index = Math.round(Math.min(1, Math.max(0, along)) * (years.length - 1));
+    hovered = { index, x: event.clientX, y: event.clientY };
+  }
 </script>
 
 <figure class="curve">
@@ -67,7 +77,40 @@
       {@const at = y(tick / 100)}
       <span class="tick" class:off={at < 0} style:inset-block-start="{at}%">{tick}%</span>
     {/each}
+    {#if hovered}
+      <div class="cursor" style:inset-inline-start="{x(hovered.index)}%"></div>
+    {/if}
+    <div
+      class="hit"
+      aria-hidden="true"
+      onpointermove={hover}
+      onpointerleave={() => (hovered = undefined)}
+    ></div>
   </div>
+  {#if hovered}
+    {@const [year, counts] = years[hovered.index]}
+    {@const total = totals[hovered.index]}
+    <div
+      class="tip"
+      class:flip={hovered.index > (years.length - 1) / 2}
+      style:left="{hovered.x}px"
+      style:top="{hovered.y}px"
+      aria-hidden="true"
+    >
+      <p><strong>{year}</strong> <span>| {count(total)} links</span></p>
+      <table>
+        <tbody>
+          {#each ROWS as fate (fate)}
+            <tr>
+              <td><Fate {fate} /></td>
+              <td>{count(counts[fate])}</td>
+              <td>{percent(counts[fate], total)}</td>
+            </tr>
+          {/each}
+        </tbody>
+      </table>
+    </div>
+  {/if}
   <figcaption>
     <span>{years[0][0]}</span>
     <span>
@@ -173,6 +216,34 @@
 
     &.off {
       opacity: 0;
+    }
+  }
+
+  .cursor {
+    position: absolute;
+    inset-block: 0;
+    inline-size: 1px;
+    background: var(--text);
+    box-shadow: 0 0 0 1px var(--surface);
+  }
+
+  .hit {
+    position: absolute;
+    inset: 0;
+  }
+
+  .tip {
+    &.flip {
+      translate: calc(-100% - 12px) 12px;
+    }
+
+    span {
+      color: var(--text-muted);
+    }
+
+    td + td {
+      padding-inline-start: var(--space-3);
+      text-align: end;
     }
   }
 
