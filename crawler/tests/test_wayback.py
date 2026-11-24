@@ -1,6 +1,18 @@
-from afterlife.wayback import changed
+import asyncio
+
+import aiohttp
+
+from afterlife.wayback import Wayback, changed
 
 URL = "https://straight2spam.xyz/"
+
+
+def test_a_capture_wayback_cant_serve_is_no_capture_not_an_outage():
+    class Garbled:
+        def get(self, *args, **kwargs):
+            raise aiohttp.ClientResponseError(None, ())
+
+    assert asyncio.run(Wayback(Garbled()).then("https://koreader.rocks/", 0)) is None
 
 
 def test_a_repurposed_home_page_is_spotted():
