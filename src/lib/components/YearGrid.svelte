@@ -40,8 +40,10 @@
   });
 
   const layout = $derived.by(() => {
-    const pitch = width >= 640 ? 3 : 2;
-    const column = (width - GAP * 11) / 12;
+    // a desktop-ish guess until the browser measures, so the page starts close to its real size
+    const span = width || 960;
+    const pitch = span >= 640 ? 3 : 2;
+    const column = (span - GAP * 11) / 12;
     const across = Math.max(1, Math.floor(column / pitch));
     const height = Math.max(...sizes.map((size) => Math.ceil(size / across)), 1) * pitch;
     return { pitch, column, across, height };
