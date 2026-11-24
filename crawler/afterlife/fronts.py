@@ -25,8 +25,9 @@ def years_before(day: date, years: int) -> date:
 
 
 def due(db: sqlite3.Connection, today: date) -> list[str]:
-    """Today and the six days after, 5, 10 and 15 years back, bar any already stored."""
-    week = [today + timedelta(days=ahead) for ahead in range(7)]
+    """The week either side of today, 5, 10 and 15 years back, bar any already stored, so a
+    week the job missed gets picked up the week after."""
+    week = [today + timedelta(days=ahead) for ahead in range(-7, 7)]
     days = {years_before(day, years).isoformat() for day in week for years in YEARS}
     stored = {day for (day,) in db.execute("select distinct day from fronts")}
     return sorted(days - stored)

@@ -50,9 +50,14 @@ def test_a_day_already_stored_isnt_fetched_again(tmp_path):
     db = connect(tmp_path / "afterlife.db")
     db.executemany("insert into fronts values ('2016-11-24', ?, ?)", [(r, r) for r in range(1, 31)])
     days = fronts.due(db, date(2026, 11, 24))
-    assert len(days) == 20 and "2016-11-24" not in days
+    assert len(days) == 41 and "2016-11-24" not in days
+
+
+def test_a_week_the_job_missed_is_picked_up_the_week_after(tmp_path):
+    days = fronts.due(connect(tmp_path / "afterlife.db"), date(2026, 11, 24))
+    assert "2016-11-17" in days and "2016-11-30" in days and "2016-12-01" not in days
 
 
 def test_a_leap_day_looks_back_to_the_28th(tmp_path):
     days = fronts.due(connect(tmp_path / "afterlife.db"), date(2028, 2, 29))
-    assert len(days) == 21 and "2023-02-28" in days
+    assert len(days) == 39 and "2023-02-28" in days
