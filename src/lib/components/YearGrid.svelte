@@ -104,17 +104,25 @@
   });
 
   $effect(() => {
-    if (!box) return;
+    const row = box;
+    if (!row) return;
+    let retry: ReturnType<typeof setTimeout>;
     const watch = new IntersectionObserver(
       ([entry]) => {
         if (!entry.isIntersecting) return;
         watch.disconnect();
-        getJson<Dot[]>(`/data/grid/${year}.json`).then((found) => (dots = found ?? []));
+        getJson<Dot[]>(`/data/grid/${year}.json`)
+          .then((found) => (dots = found ?? []))
+          // a dropped connection gets another go once things calm down
+          .catch(() => (retry = setTimeout(() => watch.observe(row), 5000)));
       },
       { rootMargin: '800px 0px' }
     );
-    watch.observe(box);
-    return () => watch.disconnect();
+    watch.observe(row);
+    return () => {
+      clearTimeout(retry);
+      watch.disconnect();
+    };
   });
 
   function dotAt(event: PointerEvent | MouseEvent) {
