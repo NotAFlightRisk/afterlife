@@ -16,6 +16,9 @@ def main():
     check = commands.add_parser("crawl", help="check unchecked stories and due re-checks")
     check.add_argument("--workers", type=int, default=64, help="sites to crawl at once")
     check.add_argument("--limit", type=int, help="stop after this many stories")
+    check.add_argument(
+        "--recheck", action="store_true", help="also re-check this week's 52nd of the stories"
+    )
     archive = commands.add_parser(
         "wayback", help="compare home pages and find walled links' captures"
     )
@@ -38,7 +41,14 @@ def main():
     if args.command in ("stories", "run"):
         asyncio.run(hn.fetch(db))
     if args.command in ("crawl", "run"):
-        asyncio.run(crawl.run(db, getattr(args, "workers", 64), getattr(args, "limit", None)))
+        asyncio.run(
+            crawl.run(
+                db,
+                getattr(args, "workers", 64),
+                getattr(args, "limit", None),
+                getattr(args, "recheck", False),
+            )
+        )
     if args.command in ("wayback", "run"):
         asyncio.run(wayback.run(db, getattr(args, "limit", None)))
     if args.command == "stats":

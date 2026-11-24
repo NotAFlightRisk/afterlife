@@ -4,6 +4,7 @@ import pytest
 
 from afterlife import crawl
 from afterlife.classify import Seen
+from afterlife.db import connect, save_check, save_stories
 
 
 class Tally:
@@ -54,8 +55,6 @@ def test_one_good_answer_resets_the_count(monkeypatch):
 
 
 def test_reclassify_brings_old_verdicts_up_to_date(tmp_path):
-    from afterlife.db import connect, save_check, save_stories
-
     db = connect(tmp_path / "afterlife.db")
     url, title = "https://blog.example.com/accounting.html", "The math of consulting"
     save_stories(
@@ -126,10 +125,32 @@ def test_a_stall_stays_a_wall_unless_the_home_page_plainly_answers(home):
 
 
 def test_a_server_error_gets_another_go_a_week_later(tmp_path):
-    from afterlife.db import connect, save_check, save_stories
-
     db = connect(tmp_path / "afterlife.db")
     story = {"url": "https://a.example/x", "title": "X", "points": 100, "comments": 0}
     save_stories(db, [{"id": 1, **story, "posted": 0, "show_hn": 0}])
     save_check(db, 1, 0, {"fate": "unsure", "evidence": "status-503", "status": 503})
     assert [row["id"] for row in crawl.pending(db, int(crawl.RECHECK_AFTER) + 1)] == [1]
+
+
+def checked_long_ago(tmp_path, *ids):
+    db = connect(tmp_path / "afterlife.db")
+    story = {"title": "A story", "points": 100, "comments": 0, "posted": 0, "show_hn": 0}
+    save_stories(db, [{**story, "id": i, "url": f"https://a.example/{i}"} for i in ids])
+    for i in ids:
+        save_check(db, i, 0, {"fate": "alive", "evidence": "alive"})
+    return db
+
+
+WEEK_527 = 527 * 7 * 86_400  # 527 % 52 is 7, so it's the turn of ids 7, 59, 111...
+
+
+def test_a_recheck_adds_this_weeks_fifty_second_of_the_stories(tmp_path):
+    db = checked_long_ago(tmp_path, 6, 7, 8, 59, 60)
+    assert crawl.pending(db, WEEK_527) == []
+    assert [row["id"] for row in crawl.pending(db, WEEK_527, recheck=True)] == [7, 59]
+
+
+def test_a_recheck_leaves_a_story_checked_this_month_alone(tmp_path):
+    db = checked_long_ago(tmp_path, 7, 59)
+    save_check(db, 59, WEEK_527 - 29 * 86_400, {"fate": "alive", "evidence": "alive"})
+    assert [row["id"] for row in crawl.pending(db, WEEK_527, recheck=True)] == [7]

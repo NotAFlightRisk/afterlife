@@ -17,6 +17,7 @@ from .net import Fetcher, NoAnswer, session
 from .urls import host_of, is_root, origin, site
 
 RECHECK_AFTER = 6.5 * 86_400
+WEEK, MONTH = 7 * 86_400, 30 * 86_400
 TRY_AGAIN = ("noanswer", "badreply", "error", "robots-error", "tls", "wall-429")
 STREAK_LIMIT = 5
 WALLED = ("reset", "stall")
@@ -35,20 +36,22 @@ def github_token() -> str | None:
         return None
 
 
-def pending(db: sqlite3.Connection, now: int) -> list[sqlite3.Row]:
+def pending(db: sqlite3.Connection, now: int, recheck: bool = False) -> list[sqlite3.Row]:
     """Stories never checked, plus those whose last check said to try again in a week, which
-    includes the server falling over."""
+    includes the server falling over. A recheck adds this week's fifty-second of the rest, bar
+    any checked in the last month, so each story gets another look about once a year."""
     marks = ",".join("?" * len(TRY_AGAIN))
     return db.execute(
         f"""with {LATEST}
             select s.id, s.url, s.title, latest.evidence before from stories s
             left join latest on latest.story = s.id
             where s.url is not null
-              and (latest.id is null or (
-                (latest.evidence in ({marks}) or latest.evidence like 'status-5%')
-                and latest.at < ?))
+              and (latest.id is null
+                or ((latest.evidence in ({marks}) or latest.evidence like 'status-5%')
+                  and latest.at < ?)
+                or (? and s.id % 52 = ? % 52 and latest.at < ?))
             order by s.id""",
-        (*TRY_AGAIN, now - RECHECK_AFTER),
+        (*TRY_AGAIN, now - RECHECK_AFTER, recheck, now // WEEK, now - MONTH),
     ).fetchall()
 
 
@@ -137,8 +140,10 @@ async def crawl_site(fetcher, github, stories: list[sqlite3.Row], tally: Tally):
         tally.add(story, outcome)
 
 
-async def run(db: sqlite3.Connection, workers: int = 64, limit: int | None = None):
-    stories = pending(db, int(time.time()))[:limit]
+async def run(
+    db: sqlite3.Connection, workers: int = 64, limit: int | None = None, recheck: bool = False
+):
+    stories = pending(db, int(time.time()), recheck)[:limit]
     token = github_token()
     lanes = defaultdict(list)
     for story in stories:
