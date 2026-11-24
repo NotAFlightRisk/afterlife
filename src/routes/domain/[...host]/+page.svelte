@@ -2,13 +2,13 @@
   import { page } from '$app/state';
   import Fate from '#lib/components/Fate.svelte';
   import StoryRows from '#lib/components/StoryRows.svelte';
-  import { fateOf, loadHost, type Row } from '#lib/data.ts';
+  import { fateOf, hostOf, loadHost, type Row } from '#lib/data.ts';
   import { FATES, works } from '#lib/fates.ts';
   import { count, date } from '#lib/format.ts';
 
   let { data } = $props();
 
-  const host = $derived((page.params.host ?? '').toLowerCase().replace(/^www\./, ''));
+  const host = $derived(hostOf(`https://${page.params.host ?? ''}`));
   let rows = $state<Row[]>();
 
   const stories = $derived(

@@ -12,9 +12,10 @@ from collections import Counter, defaultdict
 from datetime import UTC, datetime
 from pathlib import Path
 
+from yarl import URL
+
 from .classify import ALIVE, DEAD, ELSEWHERE, MOVED, UNSURE
 from .fronts import front_pages
-from .urls import host_of
 
 FATES = [ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE]
 SHARDS = 1024
@@ -48,6 +49,14 @@ def verdicts(db: sqlite3.Connection) -> list[sqlite3.Row]:
 
 def day_of(stamp: int) -> str:
     return datetime.fromtimestamp(stamp, UTC).strftime("%Y-%m-%d")
+
+
+def host_key(url: str) -> str:
+    """The host the way a browser spells it, punycode and all, so lookups land on our shard."""
+    try:
+        return (URL(url).raw_host or "").removeprefix("www.")
+    except ValueError:
+        return ""
 
 
 def shard(key: str | int) -> int:
@@ -100,7 +109,7 @@ def graveyard(linked: list[sqlite3.Row], size: int = 500) -> dict:
     Show HN launches that don't load any more."""
     by_host = defaultdict(Counter)
     for story in linked:
-        by_host[host_of(story["url"])][story["fate"]] += 1
+        by_host[host_key(story["url"])][story["fate"]] += 1
     hosts = [
         {
             "host": host,
@@ -142,7 +151,7 @@ def run(db: sqlite3.Connection, out: Path):
     for story in linked:
         groups["grid"][day_of(story["posted"])[:4]].append(story)
         groups["id"][shard(story["id"])].append(story)
-        groups["host"][shard(host_of(story["url"]))].append(story)
+        groups["host"][shard(host_key(story["url"]))].append(story)
 
     for year, group in groups["grid"].items():
         write(out, f"grid/{year}.json", [dot(s) for s in group])
@@ -157,7 +166,7 @@ def run(db: sqlite3.Connection, out: Path):
     for number, group in groups["host"].items():
         hosts = defaultdict(list)
         for story in group:
-            hosts[host_of(story["url"])].append(row(story))
+            hosts[host_key(story["url"])].append(row(story))
         write(out, f"host/{number}.json", hosts)
 
     checked = max((story["checked"] for story in linked), default=0)

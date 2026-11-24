@@ -77,6 +77,14 @@ def test_a_day_hn_ranked_itself_keeps_hn_order_and_says_so(db, tmp_path):
     assert "front" not in plain and [story["id"] for story in plain["stories"]] == [3]
 
 
+def test_a_unicode_host_is_filed_the_way_a_browser_spells_it(db, tmp_path):
+    save_stories(db, [{**STORY, "id": 5, "url": "https://www.straße.de/page"}])
+    save_check(db, 5, 100, {"fate": "dead", "evidence": "404"})
+    build.run(db, tmp_path / "data")
+    shard = json.loads((tmp_path / f"data/host/{build.shard('xn--strae-oqa.de')}.json").read_text())
+    assert [row[0] for row in shard["xn--strae-oqa.de"]] == [5]
+
+
 def test_the_build_writes_every_kind_of_file(db, tmp_path):
     check(db, 100, "dead", "404")
     out = tmp_path / "data"
