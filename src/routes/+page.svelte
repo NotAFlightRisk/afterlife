@@ -2,10 +2,11 @@
   import { tick } from 'svelte';
   import Curve from '#lib/components/Curve.svelte';
   import Fate from '#lib/components/Fate.svelte';
+  import Hosts from '#lib/components/Hosts.svelte';
   import StoryCard from '#lib/components/StoryCard.svelte';
   import YearGrid from '#lib/components/YearGrid.svelte';
   import { fateOf, loadCard, type Card, type Dot } from '#lib/data.ts';
-  import { FATES } from '#lib/fates.ts';
+  import { STACKED } from '#lib/fates.ts';
   import { count, date, inTen, plural } from '#lib/format.ts';
 
   let { data } = $props();
@@ -26,7 +27,7 @@
   ];
   const years = $derived(Object.entries(data.stats.years));
   const totals = $derived(
-    FATES.map((fate) => [fate, years.reduce((sum, [, counts]) => sum + counts[fate], 0)] as const)
+    STACKED.map((fate) => [fate, years.reduce((sum, [, counts]) => sum + counts[fate], 0)] as const)
   );
   const checked = $derived(totals.reduce((sum, [, n]) => sum + n, 0));
   const [first, oldest] = $derived(years[0]);
@@ -63,24 +64,25 @@
     property="og:description"
     content="Every link that made Hacker News since 2007, one dot each."
   />
-  <meta property="og:image" content="https://afterlife.peng.ly/og.png" />
-  <meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
 <svelte:window onkeydown={(event) => event.key === 'Escape' && (card = undefined)} />
 
 <section class="intro" aria-labelledby="headline">
-  <h1 id="headline">{headline}.</h1>
-  <p>
-    Plain deaths only: the domain's gone, a 404 or 410, or no answer twice, a week apart. Another
-    {inTen(oldest.elsewhere, oldestTotal)} now land somewhere that isn't the story.
-  </p>
-  <Curve {years} />
-  <ul class="legend" aria-label="What the colours mean">
-    {#each totals as [fate, n] (fate)}
-      <li><Fate {fate} /> {count(n)}</li>
-    {/each}
-  </ul>
+  <div class="lead">
+    <h1 id="headline">{headline}.</h1>
+    <p>
+      Plain deaths only: the domain's gone, a 404 or 410, or no answer twice, a week apart. Another
+      {inTen(oldest.elsewhere, oldestTotal)} now land somewhere that isn't the story.
+    </p>
+    <Curve {years} />
+    <ul class="legend" aria-label="What the colours mean">
+      {#each totals as [fate, n] (fate)}
+        <li><Fate {fate} /> {count(n)}</li>
+      {/each}
+    </ul>
+  </div>
+  <div class="side"><Hosts hosts={data.hosts} /></div>
 </section>
 
 <section class="grid" aria-labelledby="grid-title">
@@ -106,7 +108,14 @@
 </section>
 
 {#if hovered}
-  <div class="tip" style:left="{hovered.x}px" style:top="{hovered.y}px" aria-hidden="true">
+  <div
+    class="tip"
+    class:left={hovered.x > window.innerWidth / 2}
+    class:up={hovered.y > window.innerHeight / 2}
+    style:left="{hovered.x}px"
+    style:top="{hovered.y}px"
+    aria-hidden="true"
+  >
     <strong>{hovered.dot[4]}</strong>
     <span>
       {plural(hovered.dot[2], 'point')} | {date(hovered.dot[1])} | <Fate
@@ -127,7 +136,17 @@
 <style>
   .intro {
     display: grid;
-    gap: var(--space-3);
+    gap: var(--space-3) var(--space-8);
+
+    @media (width >= 60rem) {
+      grid-template-columns: minmax(0, 44rem) minmax(18rem, 22rem);
+    }
+  }
+
+  .lead {
+    display: grid;
+    grid-row: span 4;
+    grid-template-rows: subgrid;
     max-inline-size: 44rem;
 
     h1 {
@@ -137,6 +156,16 @@
     > p {
       max-inline-size: var(--measure);
       color: var(--text-muted);
+    }
+  }
+
+  .side {
+    max-inline-size: 22rem;
+    margin-block-start: var(--space-3);
+
+    @media (width >= 60rem) {
+      grid-area: 3 / 2 / span 2;
+      margin: 0;
     }
   }
 
@@ -188,23 +217,8 @@
     font-size: var(--size-xs);
   }
 
-  .tip {
-    position: fixed;
-    z-index: 3;
-    display: grid;
-    gap: var(--space-1);
-    max-inline-size: 20rem;
-    padding: var(--space-2) var(--space-3);
-    translate: 12px 12px;
-    background: var(--surface);
-    border: 1px solid var(--fate-elsewhere);
-    box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
-    font-size: var(--size-xs);
-    pointer-events: none;
-
-    span {
-      color: var(--text-muted);
-    }
+  .tip span {
+    color: var(--text-muted);
   }
 
   .panel {
@@ -218,7 +232,7 @@
     overflow: auto;
     padding: var(--space-4);
     background: var(--surface);
-    border: 1px solid var(--fate-elsewhere);
+    border: 1px solid var(--edge);
     box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
     overscroll-behavior: contain;
   }

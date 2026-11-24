@@ -3,7 +3,7 @@
   import Fate from '#lib/components/Fate.svelte';
   import StoryRows from '#lib/components/StoryRows.svelte';
   import { fateOf, hostOf, loadHost, type Row } from '#lib/data.ts';
-  import { FATES, works } from '#lib/fates.ts';
+  import { STACKED, works } from '#lib/fates.ts';
   import { count, date } from '#lib/format.ts';
 
   let { data } = $props();
@@ -22,7 +22,7 @@
     }))
   );
   const counts = $derived(
-    FATES.map((fate) => [fate, stories.filter((story) => story.fate === fate).length] as const)
+    STACKED.map((fate) => [fate, stories.filter((story) => story.fate === fate).length] as const)
   );
   const working = $derived(stories.filter((story) => works(story.fate)).length);
 

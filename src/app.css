@@ -6,13 +6,14 @@
   --text: #000;
   --text-muted: #696960;
   --rule: #d6d6c8;
+  --edge: #7a7a70;
   --focus: #4a6f9c;
   --selection: #c9d6e6;
 
-  --fate-alive: #d6d6c8;
-  --fate-moved: #4a6f9c;
-  --fate-dead: #1c1c1a;
-  --fate-elsewhere: #7a7a70;
+  --fate-alive: #225a93;
+  --fate-moved: #6093be;
+  --fate-dead: #902824;
+  --fate-elsewhere: #d5753a;
   --fate-unsure: #8f8f85;
   --hatch: repeating-linear-gradient(135deg, var(--fate-unsure) 0 1px, transparent 1px 3px);
 
@@ -45,7 +46,7 @@
 }
 
 html {
-  scrollbar-color: var(--fate-elsewhere) var(--surface-sunk);
+  scrollbar-color: var(--edge) var(--surface-sunk);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -98,7 +99,7 @@ input:is([type='text'], [type='date']),
 button[type='submit'],
 .button {
   padding: 0.2rem 0.5rem;
-  border: 1px solid var(--fate-elsewhere);
+  border: 1px solid var(--edge);
   border-radius: 0;
   background: var(--field);
 }
@@ -114,9 +115,62 @@ button[type='submit'],
   }
 }
 
+.switch {
+  display: flex;
+  flex-wrap: wrap;
+
+  button {
+    padding: 0;
+    border: 0;
+    background: none;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration: underline;
+    }
+
+    &[aria-pressed='true'] {
+      font-weight: bold;
+    }
+  }
+
+  button + button::before {
+    content: '|';
+    content: '|' / '';
+    display: inline-block;
+    padding-inline: 0.4em;
+    color: var(--text-muted);
+    font-weight: normal;
+  }
+}
+
 table {
   border-collapse: collapse;
   font-variant-numeric: tabular-nums;
+}
+
+.tip {
+  position: fixed;
+  z-index: 3;
+  display: grid;
+  gap: var(--space-1);
+  inline-size: max-content;
+  max-inline-size: 20rem;
+  padding: var(--space-2) var(--space-3);
+  translate: var(--across, 12px) var(--down, 12px);
+  background: var(--surface);
+  border: 1px solid var(--edge);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
+  font-size: var(--size-xs);
+  pointer-events: none;
+
+  &.left {
+    --across: calc(-100% - 12px);
+  }
+
+  &.up {
+    --down: calc(-100% - 12px);
+  }
 }
 
 .visually-hidden {

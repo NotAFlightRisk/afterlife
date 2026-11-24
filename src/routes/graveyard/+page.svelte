@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { page } from '$app/state';
   import StoryRows from '#lib/components/StoryRows.svelte';
   import { fateOf, type Row } from '#lib/data.ts';
   import { count, percent } from '#lib/format.ts';
@@ -12,6 +13,10 @@
   ] as const;
 
   let shown = $state<(typeof LISTS)[number]['id']>('upvoted');
+
+  $effect(() => {
+    shown = LISTS.find((list) => list.id === page.url.searchParams.get('show'))?.id ?? 'upvoted';
+  });
 
   const stories = (rows: Row[]) =>
     rows.map(([id, day, points, fate, title, url]) => ({
@@ -96,34 +101,6 @@
 
   h1 {
     font-size: var(--size-l);
-  }
-
-  .switch {
-    display: flex;
-    flex-wrap: wrap;
-
-    button {
-      padding: 0;
-      border: 0;
-      background: none;
-      cursor: pointer;
-
-      &:not(:first-child)::before {
-        content: '|';
-        content: '|' / '';
-        display: inline-block;
-        padding-inline: 0.4em;
-        color: var(--text-muted);
-      }
-
-      &[aria-pressed='true'] {
-        font-weight: bold;
-      }
-
-      &:hover {
-        text-decoration: underline;
-      }
-    }
   }
 
   table {

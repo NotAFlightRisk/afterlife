@@ -66,16 +66,25 @@
   }
 
   .sub {
+    --between: 1.25rem;
     display: flex;
     flex-wrap: wrap;
-    gap: 0 var(--space-2);
+    gap: 0 var(--between);
+    /* cuts off a pipe that wraps to the start of a line */
+    clip-path: inset(-1em -1em -1em -4px);
 
-    > :not(:first-child)::before {
-      content: '|';
-      content: '|' / '';
-      display: inline-block;
-      margin-inline-end: var(--space-2);
-      color: var(--rule);
+    > :not(:first-child) {
+      position: relative;
+
+      &::before {
+        content: '|';
+        content: '|' / '';
+        position: absolute;
+        inset-inline-end: 100%;
+        inline-size: var(--between);
+        text-align: center;
+        color: var(--rule);
+      }
     }
 
     a:hover {

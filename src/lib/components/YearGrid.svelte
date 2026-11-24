@@ -85,17 +85,17 @@
       return;
     }
     const colours = FATES.map((fate) => style.getPropertyValue(`--fate-${fate}`));
-    const lines = hatch(context, colours[4], ratio);
+    // a can't-tell dot hatches in what Wayback last found there
+    const [there, gone, unknown] = [0, 2, 4].map((fate) => hatch(context, colours[fate], ratio));
     const size = pitch - (pitch > 2 ? 1 : 0.5);
     stacks.forEach((stack, month) => {
       stack.forEach((dot, place) => {
         const x = month * (column + GAP) + (place % across) * pitch;
         const y = height - (Math.floor(place / across) + 1) * pitch;
         if (dot[3] === 4) {
-          const under = dot[5] === 200 ? colours[0] : dot[5] ? colours[2] : ground;
-          context.fillStyle = under;
+          context.fillStyle = ground;
           context.fillRect(x, y, size, size);
-          context.fillStyle = lines;
+          context.fillStyle = dot[5] === 200 ? there : dot[5] ? gone : unknown;
         } else {
           context.fillStyle = colours[dot[3]];
         }
