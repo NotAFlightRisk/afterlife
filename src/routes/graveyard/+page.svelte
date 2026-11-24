@@ -110,6 +110,7 @@
 
       &:not(:first-child)::before {
         content: '|';
+        content: '|' / '';
         padding-inline: 0.4em;
         color: var(--text-muted);
       }
