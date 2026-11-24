@@ -72,10 +72,8 @@
 <section class="intro" aria-labelledby="headline">
   <h1 id="headline">{headline}.</h1>
   <p>
-    That's counting plain deaths only: the domain's gone, the site says 404 or 410, or it didn't
-    answer twice, a week apart. Another {inTen(oldest.elsewhere, oldestTotal)} now land somewhere that
-    isn't the story. These are the {count(checked)} links on every story that got 100 points, plus each
-    day's top 30, as our crawler found them by {date(data.stats.checked)}.
+    Plain deaths only: the domain's gone, a 404 or 410, or no answer twice, a week apart. Another
+    {inTen(oldest.elsewhere, oldestTotal)} now land somewhere that isn't the story.
   </p>
   <Curve {years} />
   <ul class="legend" aria-label="What the colours mean">
@@ -88,7 +86,10 @@
 <section class="grid" aria-labelledby="grid-title">
   <div class="grid-head">
     <h2 id="grid-title">Every story, one dot each</h2>
-    <p>By month posted. Hover for the story, click for what happened to it.</p>
+    <p>
+      {count(checked)} links by the month they were posted, as our crawler found them by
+      {date(data.stats.checked)}. Hover for the story, click for what happened to it.
+    </p>
   </div>
   <div class="months" aria-hidden="true">
     {#each MONTHS as month (month)}<span>{month}</span>{/each}

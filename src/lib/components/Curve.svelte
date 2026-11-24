@@ -68,7 +68,7 @@
 
   .chart {
     position: relative;
-    block-size: 6rem;
+    block-size: clamp(4rem, 3rem + 5vw, 6rem);
     border-block-end: 1px solid var(--fate-elsewhere);
   }
 
