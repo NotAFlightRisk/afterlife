@@ -19,10 +19,14 @@ def main():
     check.add_argument(
         "--recheck", action="store_true", help="also re-check this week's 52nd of the stories"
     )
+    check.add_argument("--minutes", type=int, help="stop after this many minutes, leaving the rest")
     archive = commands.add_parser(
         "wayback", help="compare home pages and find walled links' captures"
     )
     archive.add_argument("--limit", type=int, help="stop after this many of each")
+    archive.add_argument(
+        "--minutes", type=int, help="stop after this many minutes, leaving the rest"
+    )
     commands.add_parser(
         "fronts", help="HN's own front pages for the coming week, 5, 10 and 15 years back"
     )
@@ -50,10 +54,11 @@ def main():
                 getattr(args, "workers", 64),
                 getattr(args, "limit", None),
                 getattr(args, "recheck", False),
+                getattr(args, "minutes", None),
             )
         )
     if args.command in ("wayback", "run"):
-        asyncio.run(wayback.run(db, getattr(args, "limit", None)))
+        asyncio.run(wayback.run(db, getattr(args, "limit", None), getattr(args, "minutes", None)))
     if args.command == "fronts":
         asyncio.run(fronts.run(db))
     if args.command == "stats":

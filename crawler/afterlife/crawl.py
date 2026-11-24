@@ -141,7 +141,11 @@ async def crawl_site(fetcher, github, stories: list[sqlite3.Row], tally: Tally):
 
 
 async def run(
-    db: sqlite3.Connection, workers: int = 64, limit: int | None = None, recheck: bool = False
+    db: sqlite3.Connection,
+    workers: int = 64,
+    limit: int | None = None,
+    recheck: bool = False,
+    minutes: int | None = None,
 ):
     stories = pending(db, int(time.time()), recheck)[:limit]
     token = github_token()
@@ -174,7 +178,11 @@ async def run(
                 tally.report()
 
         reporter = asyncio.create_task(progress())
-        await asyncio.gather(*(worker() for _ in range(workers)))
+        try:
+            async with asyncio.timeout(minutes * 60 if minutes else None):
+                await asyncio.gather(*(worker() for _ in range(workers)))
+        except TimeoutError:
+            log.info("%d-minute limit reached, the rest wait for the next run", minutes)
         reporter.cancel()
     db.commit()
     tally.report()

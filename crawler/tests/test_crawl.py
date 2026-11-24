@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 import pytest
 
@@ -132,10 +133,15 @@ def test_a_server_error_gets_another_go_a_week_later(tmp_path):
     assert [row["id"] for row in crawl.pending(db, int(crawl.RECHECK_AFTER) + 1)] == [1]
 
 
-def checked_long_ago(tmp_path, *ids):
+def saved(tmp_path, *ids):
     db = connect(tmp_path / "afterlife.db")
     story = {"title": "A story", "points": 100, "comments": 0, "posted": 0, "show_hn": 0}
     save_stories(db, [{**story, "id": i, "url": f"https://a.example/{i}"} for i in ids])
+    return db
+
+
+def checked_long_ago(tmp_path, *ids):
+    db = saved(tmp_path, *ids)
     for i in ids:
         save_check(db, i, 0, {"fate": "alive", "evidence": "alive"})
     return db
@@ -154,3 +160,22 @@ def test_a_recheck_leaves_a_story_checked_this_month_alone(tmp_path):
     db = checked_long_ago(tmp_path, 7, 59)
     save_check(db, 59, WEEK_527 - 29 * 86_400, {"fate": "alive", "evidence": "alive"})
     assert [row["id"] for row in crawl.pending(db, WEEK_527, recheck=True)] == [7]
+
+
+def test_out_of_minutes_the_crawl_keeps_what_it_checked_and_leaves_the_rest(tmp_path, monkeypatch):
+    db, clock = saved(tmp_path, *range(1, 101)), [0.0]
+
+    async def slow_check(fetcher, github, story):
+        clock[0] += 1
+        await asyncio.sleep(0)
+        return {"fate": "alive", "evidence": "alive"}
+
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(crawl, "check", slow_check)
+    monkeypatch.setattr(crawl, "github_token", lambda: None)
+    asyncio.run(crawl.run(db, minutes=1))
+    kept = {
+        row[0] for row in connect(tmp_path / "afterlife.db").execute("select story from checks")
+    }
+    left = {row["id"] for row in crawl.pending(db, int(time.time()))}
+    assert kept and left and kept.isdisjoint(left) and kept | left == set(range(1, 101))

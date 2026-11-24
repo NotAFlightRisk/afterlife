@@ -1,8 +1,11 @@
 import asyncio
+import time
 
 import aiohttp
 
-from afterlife.wayback import Wayback, changed
+from afterlife import wayback
+from afterlife.db import connect, save_check, save_stories
+from afterlife.wayback import Wayback, changed, due, save_capture
 
 URL = "https://straight2spam.xyz/"
 
@@ -34,9 +37,6 @@ def test_no_capture_or_no_title_means_no_verdict():
 
 
 def test_the_pass_picks_flagged_home_pages_and_walled_links_once(tmp_path):
-    from afterlife.db import connect, save_check, save_stories
-    from afterlife.wayback import due, save_capture
-
     db = connect(tmp_path / "afterlife.db")
     stories = [
         {
@@ -61,3 +61,22 @@ def test_the_pass_picks_flagged_home_pages_and_walled_links_once(tmp_path):
     assert [s["id"] for s in due(db, "good", walled)] == [3]
     save_capture(db, 3, "good", ("20200101000000", 200))
     assert due(db, "good", walled) == []
+
+
+def test_out_of_minutes_the_wayback_pass_keeps_what_it_found(tmp_path, monkeypatch):
+    db, clock = connect(tmp_path / "afterlife.db"), [0.0]
+    story = {"title": "A story", "points": 100, "comments": 0, "posted": 0, "show_hn": 0}
+    save_stories(db, [{**story, "id": i, "url": f"https://site{i}.example/"} for i in range(1, 6)])
+    for i in range(1, 6):
+        save_check(db, i, 10, {"fate": "unsure", "evidence": "wall-403"})
+
+    async def slow_lookup(self, url):
+        clock[0] += 25
+        await asyncio.sleep(0)
+        return ("20200101000000", 200)
+
+    monkeypatch.setattr(time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(Wayback, "last_good", slow_lookup)
+    asyncio.run(wayback.run(db, minutes=1))
+    found = connect(tmp_path / "afterlife.db").execute("select count(*) from captures").fetchone()
+    assert 0 < found[0] < 5

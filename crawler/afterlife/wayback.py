@@ -5,6 +5,7 @@ around the day it was posted, since that's where Show HN sites get repurposed. A
 wall gets the newest capture that isn't one, which annotates the verdict but never changes it.
 """
 
+import asyncio
 import json
 import logging
 import sqlite3
@@ -116,7 +117,7 @@ async def note_last_good(db: sqlite3.Connection, wayback: Wayback, story: sqlite
     save_capture(db, story["id"], "good", await wayback.last_good(story["url"]))
 
 
-async def run(db: sqlite3.Connection, limit: int | None = None):
+async def run(db: sqlite3.Connection, limit: int | None = None, minutes: int | None = None):
     homes = due(db, "then", "latest.fate = 'alive' and latest.detail like '%\"then\": true%'")
     walled = due(db, "good", "latest.fate = 'unsure' and latest.evidence != 'noanswer'")
     log.info(
@@ -127,12 +128,16 @@ async def run(db: sqlite3.Connection, limit: int | None = None):
         lookups = [(compare_home, s) for s in homes[:limit]]
         lookups += [(note_last_good, s) for s in walled[:limit]]
         try:
-            for done, (look_up, story) in enumerate(lookups, 1):
-                await look_up(db, wayback, story)
-                db.commit()
-                if done % 500 == 0:
-                    log.info("Wayback: %d of %d looked up", done, len(lookups))
+            async with asyncio.timeout(minutes * 60 if minutes else None):
+                for done, (look_up, story) in enumerate(lookups, 1):
+                    await look_up(db, wayback, story)
+                    db.commit()
+                    if done % 500 == 0:
+                        log.info("Wayback: %d of %d looked up", done, len(lookups))
         except NoAnswer:
             log.warning("The Wayback Machine has stopped answering, the next run carries on")
+            return
+        except TimeoutError:
+            log.info("Wayback: %d-minute limit reached, the next run carries on", minutes)
             return
     log.info("Wayback pass done")
