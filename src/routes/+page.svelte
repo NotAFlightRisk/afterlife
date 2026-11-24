@@ -104,7 +104,14 @@
 </section>
 
 {#if hovered}
-  <div class="tip" style:left="{hovered.x}px" style:top="{hovered.y}px" aria-hidden="true">
+  <div
+    class="tip"
+    class:left={hovered.x > window.innerWidth / 2}
+    class:up={hovered.y > window.innerHeight / 2}
+    style:left="{hovered.x}px"
+    style:top="{hovered.y}px"
+    aria-hidden="true"
+  >
     <strong>{hovered.dot[4]}</strong>
     <span>
       {plural(hovered.dot[2], 'point')} | {date(hovered.dot[1])} | <Fate

@@ -89,7 +89,8 @@
     {@const total = totals[hovered.index]}
     <div
       class="tip"
-      class:flip={hovered.index > (years.length - 1) / 2}
+      class:left={hovered.x > window.innerWidth / 2}
+      class:up={hovered.y > window.innerHeight / 2}
       style:left="{hovered.x}px"
       style:top="{hovered.y}px"
       aria-hidden="true"
@@ -230,10 +231,6 @@
   }
 
   .tip {
-    &.flip {
-      translate: calc(-100% - 12px) 12px;
-    }
-
     span {
       color: var(--text-muted);
     }

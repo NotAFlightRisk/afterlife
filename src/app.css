@@ -127,14 +127,23 @@ table {
   z-index: 3;
   display: grid;
   gap: var(--space-1);
+  inline-size: max-content;
   max-inline-size: 20rem;
   padding: var(--space-2) var(--space-3);
-  translate: 12px 12px;
+  translate: var(--across, 12px) var(--down, 12px);
   background: var(--surface);
   border: 1px solid var(--edge);
   box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
   font-size: var(--size-xs);
   pointer-events: none;
+
+  &.left {
+    --across: calc(-100% - 12px);
+  }
+
+  &.up {
+    --down: calc(-100% - 12px);
+  }
 }
 
 .visually-hidden {
