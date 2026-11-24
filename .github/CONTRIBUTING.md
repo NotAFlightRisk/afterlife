@@ -12,7 +12,7 @@ Bug reports, typo fixes and whole features are all welcome. By joining in, you a
 - 💡 **Suggest a feature** - open a [feature request](https://github.com/NotAFlightRisk/afterlife/issues/new?template=feature_request.yml)
 - 📖 **Improve the docs** - typos, unclear wording and missing examples are all fair game
 - 🔧 **Submit a fix** - see below
-- 🔒 **Report a vulnerability** - please *don't* open a public issue, see [SECURITY.md](./SECURITY.md)
+- 🔒 **Report a vulnerability** - please _don't_ open a public issue, see [SECURITY.md](./SECURITY.md)
 
 ---
 

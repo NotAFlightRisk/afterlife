@@ -1,7 +1,7 @@
 name: 🪦 Wrong verdict
 description: A link we called dead, moved or anything else, that isn't
-title: "[Verdict]: "
-labels: ["verdict", "triage"]
+title: '[Verdict]: '
+labels: ['verdict', 'triage']
 body:
   - type: input
     id: story
