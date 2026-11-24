@@ -21,6 +21,7 @@ from .urls import host_of
 
 AVAILABLE = "https://archive.org/wayback/available"
 OUTAGE_WAIT, PATIENCE = 15 * 60, 8
+GARBLED = (aiohttp.ClientResponseError, aiohttp.ClientPayloadError)
 CDX = "https://web.archive.org/cdx/search/cdx"
 log = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ class Wayback:
     def __init__(self, session: aiohttp.ClientSession):
         self.session, self.gate = session, Gate(4.0)
 
-    async def get(self, url: str, params: dict | None = None) -> tuple[int, str]:
+    async def get(self, url: str, params: dict | None = None, capture=False) -> tuple[int, str]:
         for _ in range(4):
             try:
                 async with (
@@ -40,10 +41,11 @@ class Wayback:
                         self.gate.hold(retry_after(r.headers.get("retry-after")))
                         continue
                     return r.status, decode(await r.read(), r.charset)
-            except (aiohttp.ClientResponseError, aiohttp.ClientPayloadError):
-                log.warning("Wayback can't serve %s cleanly, so it counts as no capture", url)
-                return 0, ""
             except (TimeoutError, aiohttp.ClientError, OSError) as e:
+                # a capture it can't serve is no capture, but a garbled API answer is an outage
+                if capture and isinstance(e, GARBLED):
+                    log.warning("Wayback can't serve %s cleanly, so it counts as no capture", url)
+                    return 0, ""
                 log.warning("Wayback fell over on %s (%s)", url, kind_of(e))
                 self.gate.hold(60)
         raise NoAnswer("wayback")
@@ -56,7 +58,7 @@ class Wayback:
         if not closest.get("available"):
             return None
         raw = f"https://web.archive.org/web/{closest['timestamp']}id_/{url}"
-        status, page = await self.get(raw)
+        status, page = await self.get(raw, capture=True)
         return (closest["timestamp"], title_of(page)) if status == 200 else None
 
     async def last_good(self, url: str) -> tuple[str, int] | None:

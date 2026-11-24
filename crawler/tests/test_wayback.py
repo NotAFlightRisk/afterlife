@@ -6,22 +6,54 @@ import pytest
 
 from afterlife import wayback
 from afterlife.db import connect, save_check, save_stories
-from afterlife.net import NoAnswer
+from afterlife.net import Gate, NoAnswer
 from afterlife.wayback import Wayback, changed, due, save_capture
 
 URL = "https://straight2spam.xyz/"
 
 
-@pytest.mark.parametrize(
-    "garbled",
-    [aiohttp.ClientResponseError(None, ()), aiohttp.ClientPayloadError("says gzip, isn't")],
-)
-def test_a_capture_wayback_cant_serve_is_no_capture_not_an_outage(garbled):
-    class Garbled:
-        def get(self, *args, **kwargs):
-            raise garbled
+class Answer:
+    status, charset = 200, "utf-8"
 
-    assert asyncio.run(Wayback(Garbled()).then("https://koreader.rocks/", 0)) is None
+    async def read(self):
+        return b'{"archived_snapshots": {"closest": {"available": true, "timestamp": "2020"}}}'
+
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_):
+        pass
+
+
+class Archive:
+    """Answers the availability API, and garbles whatever it's told to."""
+
+    def __init__(self, garbled: Exception, where: str):
+        self.garbled, self.where = garbled, where
+
+    def get(self, url, **kwargs):
+        if self.where in url:
+            raise self.garbled
+        return Answer()
+
+
+GARBLED = [aiohttp.ClientResponseError(None, ()), aiohttp.ClientPayloadError("says gzip, isn't")]
+
+
+@pytest.mark.parametrize("garbled", GARBLED)
+def test_a_capture_wayback_cant_serve_is_no_capture_not_an_outage(garbled):
+    archive = Wayback(Archive(garbled, where="id_/"))
+    archive.gate = Gate(0)
+    assert asyncio.run(archive.then("https://koreader.rocks/", 0)) is None
+
+
+@pytest.mark.parametrize("garbled", GARBLED)
+def test_a_garbled_api_answer_is_an_outage_not_never_archived(garbled, monkeypatch):
+    monkeypatch.setattr(Gate, "hold", lambda self, seconds: None)
+    archive = Wayback(Archive(garbled, where="available"))
+    archive.gate = Gate(0)
+    with pytest.raises(NoAnswer):
+        asyncio.run(archive.then("https://koreader.rocks/", 0))
 
 
 def test_a_repurposed_home_page_is_spotted():
