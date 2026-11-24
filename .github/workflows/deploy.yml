@@ -58,9 +58,9 @@ jobs:
         run: |
           mkdir -p data
           curl -fsS -H "Authorization: Bearer $TOKEN" "$STATE" | gunzip > data/afterlife.db
-          stories=$(python3 -c "import sqlite3; print(sqlite3.connect('data/afterlife.db').execute('select count(*) from stories').fetchone()[0])")
-          echo "FETCHED=$stories" >> "$GITHUB_ENV"
-          echo "📦 $(du -h data/afterlife.db | cut -f1) of crawl state, $stories stories" >> "$GITHUB_STEP_SUMMARY"
+          fetched=$(python3 scripts/counts.py data/afterlife.db)
+          echo "FETCHED=$fetched" >> "$GITHUB_ENV"
+          echo "📦 $(du -h data/afterlife.db | cut -f1) of crawl state: $fetched" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check this week's slice
         if: env.CRAWL == 'true'
@@ -80,13 +80,7 @@ jobs:
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          python3 - <<'PY'
-          import os, sqlite3
-          db = sqlite3.connect("data/afterlife.db")
-          assert db.execute("pragma wal_checkpoint(truncate)").fetchone()[0] == 0, "WAL still busy"
-          stories = db.execute("select count(*) from stories").fetchone()[0]
-          assert stories >= int(os.environ["FETCHED"]), f"only {stories} stories left"
-          PY
+          python3 scripts/counts.py data/afterlife.db --at-least "$FETCHED"
           gzip -c data/afterlife.db | curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/gzip" --data-binary @- "$STATE" > /dev/null
 
