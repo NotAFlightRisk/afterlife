@@ -52,12 +52,15 @@ jobs:
           package-manager-cache: false
 
       - name: Fetch the crawl so far
+        id: fetch
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
           mkdir -p data
           curl -fsS -H "Authorization: Bearer $TOKEN" "$STATE" | gunzip > data/afterlife.db
-          echo "📦 $(du -h data/afterlife.db | cut -f1) of crawl state" >> "$GITHUB_STEP_SUMMARY"
+          stories=$(python3 -c "import sqlite3; print(sqlite3.connect('data/afterlife.db').execute('select count(*) from stories').fetchone()[0])")
+          echo "FETCHED=$stories" >> "$GITHUB_ENV"
+          echo "📦 $(du -h data/afterlife.db | cut -f1) of crawl state, $stories stories" >> "$GITHUB_STEP_SUMMARY"
 
       - name: Check this week's slice
         if: env.CRAWL == 'true'
@@ -71,12 +74,19 @@ jobs:
           afterlife wayback --minutes 45
           { echo '```'; afterlife stats; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
+      # even when the crawl fell over, so a week's checks aren't lost, but never a smaller copy
       - name: Put the crawl back
-        if: env.CRAWL == 'true'
+        if: always() && env.CRAWL == 'true' && steps.fetch.outcome == 'success'
         env:
           TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: |
-          python3 -c "import sqlite3; sqlite3.connect('data/afterlife.db').execute('pragma wal_checkpoint(truncate)')"
+          python3 - <<'PY'
+          import os, sqlite3
+          db = sqlite3.connect("data/afterlife.db")
+          assert db.execute("pragma wal_checkpoint(truncate)").fetchone()[0] == 0, "WAL still busy"
+          stories = db.execute("select count(*) from stories").fetchone()[0]
+          assert stories >= int(os.environ["FETCHED"]), f"only {stories} stories left"
+          PY
           gzip -c data/afterlife.db | curl -fsS -X PUT -H "Authorization: Bearer $TOKEN" \
             -H "Content-Type: application/gzip" --data-binary @- "$STATE" > /dev/null
 
