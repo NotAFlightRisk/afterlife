@@ -11,10 +11,11 @@ import aiohttp
 from .db import save_stories
 from .net import UA
 
-API = "https://hn.algolia.com/api/v1/search_by_date"
+API = "https://hn.algolia.com/api/v1"
 FIELDS = "title,url,points,num_comments,created_at_i,_tags"
 FIRST_DAY = int(datetime(2007, 2, 19, tzinfo=UTC).timestamp())
 DAY, MONTH = 86_400, 30 * 86_400
+TIMEOUT = aiohttp.ClientTimeout(total=60)
 log = logging.getLogger(__name__)
 
 
@@ -25,26 +26,34 @@ class Algolia:
         self.session, self.gap, self.free_at = session, 1 / per_second, 0.0
         self.lock = asyncio.Lock()
 
-    async def search(self, start: int, stop: int, min_points: int, size: int = 1000) -> dict:
+    async def get(self, endpoint: str, params: dict) -> dict:
         async with self.lock:
             await asyncio.sleep(max(0, self.free_at - time.monotonic()))
             self.free_at = time.monotonic() + self.gap
-        params = {
-            "tags": "story",
-            "hitsPerPage": size,
-            "attributesToRetrieve": FIELDS,
-            "attributesToHighlight": "[]",
-            "numericFilters": f"created_at_i>={start},created_at_i<{stop},points>={min_points}",
-        }
+        query = {**params, "attributesToRetrieve": FIELDS, "attributesToHighlight": "[]"}
         for attempt in range(6):
             try:
-                async with self.session.get(API, params=params, headers={"User-Agent": UA}) as r:
+                async with self.session.get(
+                    f"{API}/{endpoint}", params=query, headers={"User-Agent": UA}
+                ) as r:
                     r.raise_for_status()
                     return await r.json()
             except (TimeoutError, aiohttp.ClientError) as e:
                 log.warning("Algolia fell over (%s), trying again shortly", e)
                 await asyncio.sleep(5 * 2**attempt)
-        raise RuntimeError(f"Algolia won't answer for {params['numericFilters']}")
+        raise RuntimeError(f"Algolia won't answer for {params}")
+
+    async def search(self, start: int, stop: int, min_points: int, size: int = 1000) -> dict:
+        filters = f"created_at_i>={start},created_at_i<{stop},points>={min_points}"
+        return await self.get(
+            "search_by_date", {"tags": "story", "hitsPerPage": size, "numericFilters": filters}
+        )
+
+    async def stories(self, ids: list[int]) -> list[dict]:
+        """By id, and only the stories, since their comments carry the same story_<id> tag."""
+        tags = ",".join(f"story_{i}" for i in ids)
+        found = await self.get("search", {"tags": f"story,({tags})", "hitsPerPage": len(ids)})
+        return [story(h) for h in found["hits"]]
 
 
 def story(hit: dict) -> dict:
@@ -117,8 +126,17 @@ async def front_pages(api: Algolia, db: sqlite3.Connection, until: int):
 async def fetch(db: sqlite3.Connection):
     """Settled stories only: anything posted in the last two days is still gathering points."""
     until = int(time.time()) // DAY * DAY - 2 * DAY
-    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=60)) as session:
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
         api = Algolia(session)
         await popular(api, db, until)
         await front_pages(api, db, until)
     log.info("%d stories in all", db.execute("select count(*) from stories").fetchone()[0])
+
+
+async def fill_in(db: sqlite3.Connection, ids: list[int]):
+    """Stories we've only got the ids of, thirty to a search."""
+    async with aiohttp.ClientSession(timeout=TIMEOUT) as session:
+        api = Algolia(session)
+        for i in range(0, len(ids), 30):
+            save_stories(db, await api.stories(ids[i : i + 30]))
+            db.commit()

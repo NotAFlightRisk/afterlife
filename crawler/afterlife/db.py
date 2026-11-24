@@ -35,6 +35,12 @@ create table if not exists captures (
   title text
 );
 create index if not exists captures_story on captures(story, kind);
+create table if not exists fronts (
+  day text not null,
+  rank integer not null,
+  story integer not null,
+  primary key (day, rank)
+);
 """
 
 

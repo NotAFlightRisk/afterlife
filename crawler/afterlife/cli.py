@@ -4,7 +4,7 @@ import fcntl
 import logging
 from pathlib import Path
 
-from . import build, crawl, hn, wayback
+from . import build, crawl, fronts, hn, wayback
 from .db import connect
 
 
@@ -23,6 +23,9 @@ def main():
         "wayback", help="compare home pages and find walled links' captures"
     )
     archive.add_argument("--limit", type=int, help="stop after this many of each")
+    commands.add_parser(
+        "fronts", help="HN's own front pages for the coming week, 5, 10 and 15 years back"
+    )
     commands.add_parser("run", help="stories, crawl, then the Wayback pass")
     commands.add_parser("stats", help="fates by year, as things stand")
     commands.add_parser("reclassify", help="re-run the classifier over every stored check")
@@ -51,6 +54,8 @@ def main():
         )
     if args.command in ("wayback", "run"):
         asyncio.run(wayback.run(db, getattr(args, "limit", None)))
+    if args.command == "fronts":
+        asyncio.run(fronts.run(db))
     if args.command == "stats":
         crawl.stats(db)
     if args.command == "reclassify":
