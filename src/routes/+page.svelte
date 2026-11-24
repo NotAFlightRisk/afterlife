@@ -63,8 +63,6 @@
     property="og:description"
     content="Every link that made Hacker News since 2007, one dot each."
   />
-  <meta property="og:image" content="https://afterlife.peng.ly/og.png" />
-  <meta name="twitter:card" content="summary_large_image" />
 </svelte:head>
 
 <svelte:window onkeydown={(event) => event.key === 'Escape' && (card = undefined)} />

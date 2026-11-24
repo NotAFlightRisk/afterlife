@@ -13,6 +13,11 @@
   ];
 </script>
 
+<svelte:head>
+  <meta property="og:image" content="https://afterlife.peng.ly/og.png" />
+  <meta name="twitter:card" content="summary_large_image" />
+</svelte:head>
+
 <div class="page">
   <header class="masthead">
     <a class="name" href="/">Hacker Afterlife</a>
