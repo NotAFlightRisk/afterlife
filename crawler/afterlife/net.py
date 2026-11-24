@@ -328,14 +328,16 @@ class Fetcher:
 
     async def load_robots(self, base: str) -> RobotFileParser | str:
         url = base + "/robots.txt"
-        for _ in range(5):
+        for hop in range(5):
+            # past the first hop it's somewhere else that's gone, which says nothing about this site
+            unreachable = "robots-error" if hop else None
             problem = await self.lookup(urlsplit(url).hostname or "")
             if problem:
-                return problem
+                return unreachable or problem
             try:
                 reply = await self.send(url, MAX_ROBOTS, robots=True)
             except NoAnswer as e:
-                return e.kind
+                return unreachable or e.kind
             if reply.status in REDIRECTS and reply.location:
                 url = urljoin(url, reply.location)
                 continue

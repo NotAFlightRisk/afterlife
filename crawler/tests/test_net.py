@@ -13,6 +13,7 @@ from afterlife.net import (
     Fetcher,
     NoAnswer,
     PublicResolver,
+    Reply,
     decode,
     is_public,
     kind_of,
@@ -199,3 +200,24 @@ def test_half_a_robots_txt_is_no_robots_txt():
 def test_a_cookie_name_python_wont_send_back_is_dropped():
     assert COOKIE_NAME.fullmatch("session_id")
     assert not COOKIE_NAME.fullmatch("gdpr[consent_types]")
+
+
+def robots_that_redirect_to(problem_host: str, own_host_problem: str = ""):
+    fetcher = Fetcher(session=None)
+
+    async def lookup(host):
+        return own_host_problem if host == "alive.example" else "dns"
+
+    async def send(url, limit, robots=False, tls=None, cookies=None):
+        return Reply(302, f"https://{problem_host}/robots.txt", False, "", {})
+
+    fetcher.lookup, fetcher.send = lookup, send
+    return asyncio.run(fetcher.load_robots("https://alive.example"))
+
+
+def test_a_robots_txt_that_redirects_somewhere_gone_is_unreadable_not_dead():
+    assert robots_that_redirect_to("gone.example") == "robots-error"
+
+
+def test_a_site_whose_own_name_is_gone_is_still_dead():
+    assert robots_that_redirect_to("gone.example", own_host_problem="dns") == "dns"
