@@ -1,4 +1,5 @@
 import gzip
+import json
 
 import pytest
 
@@ -63,6 +64,17 @@ def test_a_repurposed_home_page_shows_what_it_was(db):
     shown = build.card(build.verdicts(db)[0])
     assert (shown["was"], shown["then"]) == ("A story, then", "20100105000000")
     assert "detail" not in shown
+
+
+def test_a_day_hn_ranked_itself_keeps_hn_order_and_says_so(db, tmp_path):
+    evening_before = {**STORY, "id": 3, "posted": STORY["posted"] - 3_600, "points": 999}
+    save_stories(db, [evening_before])
+    db.executemany("insert into fronts values ('2010-01-02', ?, ?)", [(1, 2), (2, 1), (3, 3)])
+    build.run(db, tmp_path / "data")
+    day = json.loads((tmp_path / "data/day/2010-01-02.json").read_text())
+    assert day["front"] and [story["id"] for story in day["stories"]] == [2, 1, 3]
+    plain = json.loads((tmp_path / "data/day/2010-01-01.json").read_text())
+    assert "front" not in plain and [story["id"] for story in plain["stories"]] == [3]
 
 
 def test_the_build_writes_every_kind_of_file(db, tmp_path):

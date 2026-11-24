@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from .classify import ALIVE, DEAD, ELSEWHERE, MOVED, UNSURE
+from .fronts import front_pages
 from .urls import host_of
 
 FATES = [ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE]
@@ -145,9 +146,12 @@ def run(db: sqlite3.Connection, out: Path):
 
     for year, group in groups["grid"].items():
         write(out, f"grid/{year}.json", [dot(s) for s in group])
+    fronts, by_id = front_pages(db), {story["id"]: story for story in stories}
     for day, group in groups["day"].items():
-        top = sorted(group, key=lambda s: (-s["points"], s["id"]))[:30]
-        write(out, f"day/{day}.json", [card(s) for s in top])
+        ranked = [by_id[story_id] for story_id in fronts.get(day, []) if story_id in by_id]
+        top = ranked or sorted(group, key=lambda s: (-s["points"], s["id"]))[:30]
+        page = {"stories": [card(s) for s in top]}
+        write(out, f"day/{day}.json", {**page, "front": True} if ranked else page)
     for number, group in groups["id"].items():
         write(out, f"id/{number}.json", {s["id"]: card(s) for s in group})
     for number, group in groups["host"].items():
