@@ -6,13 +6,16 @@
   --text: #000;
   --text-muted: #696960;
   --rule: #d6d6c8;
+  --edge: #7a7a70;
   --focus: #4a6f9c;
   --selection: #c9d6e6;
 
-  --fate-alive: #d6d6c8;
-  --fate-moved: #4a6f9c;
-  --fate-dead: #1c1c1a;
-  --fate-elsewhere: #7a7a70;
+  /* links that work in blue, broken ones in red and orange, can't tell in grey between. Every pair
+     stays apart for colour-blind readers, and all but the hatch stand out 3:1 from the page */
+  --fate-alive: #225a93;
+  --fate-moved: #6093be;
+  --fate-dead: #902824;
+  --fate-elsewhere: #d5753a;
   --fate-unsure: #8f8f85;
   --hatch: repeating-linear-gradient(135deg, var(--fate-unsure) 0 1px, transparent 1px 3px);
 
@@ -45,7 +48,7 @@
 }
 
 html {
-  scrollbar-color: var(--fate-elsewhere) var(--surface-sunk);
+  scrollbar-color: var(--edge) var(--surface-sunk);
   -webkit-text-size-adjust: 100%;
 }
 
@@ -98,7 +101,7 @@ input:is([type='text'], [type='date']),
 button[type='submit'],
 .button {
   padding: 0.2rem 0.5rem;
-  border: 1px solid var(--fate-elsewhere);
+  border: 1px solid var(--edge);
   border-radius: 0;
   background: var(--field);
 }

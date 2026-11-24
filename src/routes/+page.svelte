@@ -197,7 +197,7 @@
     padding: var(--space-2) var(--space-3);
     translate: 12px 12px;
     background: var(--surface);
-    border: 1px solid var(--fate-elsewhere);
+    border: 1px solid var(--edge);
     box-shadow: 0 2px 8px rgb(0 0 0 / 0.15);
     font-size: var(--size-xs);
     pointer-events: none;
@@ -218,7 +218,7 @@
     overflow: auto;
     padding: var(--space-4);
     background: var(--surface);
-    border: 1px solid var(--fate-elsewhere);
+    border: 1px solid var(--edge);
     box-shadow: 0 4px 16px rgb(0 0 0 / 0.18);
     overscroll-behavior: contain;
   }

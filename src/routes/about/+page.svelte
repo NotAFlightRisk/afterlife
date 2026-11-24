@@ -53,8 +53,8 @@
     <dd>
       A bot wall, a consent page, a server error, a page that says yes to any made-up address, or a
       robots.txt that asked us not to look. These are hatched in the grid, and where the Wayback
-      Machine has a copy, the colour under the hatching is what its newest copy found: pale if the
-      page was there, black if it was already gone.
+      Machine has a copy, the hatching takes the colour of what its newest copy found: blue if the
+      page was there, red if it was already gone.
     </dd>
   </dl>
   <p>
