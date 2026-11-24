@@ -51,6 +51,20 @@ def test_a_walled_dot_carries_its_last_good_capture(db):
     assert build.dot(build.verdicts(db)[0])[-1] == 404
 
 
+@pytest.mark.parametrize("evidence", ["dns", "noanswer-twice"])
+def test_a_gone_domain_and_a_dead_server_read_the_same(db, evidence):
+    check(db, 100, "dead", evidence)
+    assert build.card(build.verdicts(db)[0])["evidence"] == "gone"
+
+
+def test_a_repurposed_home_page_shows_what_it_was(db):
+    detail = {"then": True, "captured": "20100105000000", "was": "A story, then"}
+    save_check(db, 1, 100, {"fate": "unsure", "evidence": "home-changed", "detail": detail})
+    shown = build.card(build.verdicts(db)[0])
+    assert (shown["was"], shown["then"]) == ("A story, then", "20100105000000")
+    assert "detail" not in shown
+
+
 def test_the_build_writes_every_kind_of_file(db, tmp_path):
     check(db, 100, "dead", "404")
     out = tmp_path / "data"

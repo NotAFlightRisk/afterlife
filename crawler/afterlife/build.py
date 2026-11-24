@@ -17,6 +17,8 @@ from .urls import host_of
 
 FATES = [ALIVE, MOVED, DEAD, ELSEWHERE, UNSURE]
 SHARDS = 1024
+# a gone domain and a dead server read the same, so nobody gets a list of domains to register
+PUBLIC = {"dns": "gone", "noanswer-twice": "gone"}
 log = logging.getLogger(__name__)
 
 VERDICTS = """
@@ -28,7 +30,7 @@ good as (
   select story, captured, status, row_number() over (partition by story order by at desc) pick
   from captures where kind = 'good')
 select s.id, s.url, s.title, s.points, s.comments, s.posted, s.show_hn,
-  v.fate, v.evidence, v.status, v.final, v.title now, v.at checked,
+  v.fate, v.evidence, v.status, v.final, v.title now, v.at checked, v.detail,
   g.captured, g.status captured_status
 from stories s
 left join ranked v on v.story = s.id and v.pick = 1
@@ -54,9 +56,14 @@ def shard(key: str | int) -> int:
 def card(story: sqlite3.Row) -> dict:
     """Everything a story card shows, minus the blanks."""
     fields = dict(story)
+    detail = json.loads(fields.pop("detail") or "{}")
     fields.update(
-        day=day_of(story["posted"]), checked=story["checked"] and day_of(story["checked"])
+        day=day_of(story["posted"]),
+        checked=story["checked"] and day_of(story["checked"]),
+        evidence=PUBLIC.get(story["evidence"], story["evidence"]),
     )
+    if story["evidence"] == "home-changed":
+        fields.update(was=detail.get("was"), then=detail.get("captured"))
     del fields["posted"], fields["show_hn"]
     return {key: value for key, value in fields.items() if value is not None}
 
@@ -67,6 +74,11 @@ def dot(story: sqlite3.Row) -> list:
     fate = FATES.index(story["fate"])
     extra = [story["captured_status"]] if story["fate"] == UNSURE and story["captured"] else []
     return [story["id"], day_of(story["posted"]), story["points"], fate, story["title"], *extra]
+
+
+def row(story: sqlite3.Row) -> list:
+    """A dot with its link instead, for lists that point at the Wayback Machine."""
+    return [*dot(story)[:5], story["url"]]
 
 
 def write(out: Path, name: str, data):
@@ -100,9 +112,9 @@ def graveyard(linked: list[sqlite3.Row], size: int = 500) -> dict:
     ]
     upvoted = sorted(linked, key=lambda story: -story["points"])
     return {
-        "upvoted": [dot(s) for s in upvoted if s["fate"] == DEAD][:size],
+        "upvoted": [row(s) for s in upvoted if s["fate"] == DEAD][:size],
         "hosts": sorted(hosts, key=lambda h: -(h["dead"] + h["elsewhere"]))[:size],
-        "show_hn": [dot(s) for s in upvoted if s["show_hn"] and s["fate"] in (DEAD, ELSEWHERE)][
+        "show_hn": [row(s) for s in upvoted if s["show_hn"] and s["fate"] in (DEAD, ELSEWHERE)][
             :size
         ],
     }
@@ -141,11 +153,15 @@ def run(db: sqlite3.Connection, out: Path):
     for number, group in groups["host"].items():
         hosts = defaultdict(list)
         for story in group:
-            hosts[host_of(story["url"])].append(dot(story))
+            hosts[host_of(story["url"])].append(row(story))
         write(out, f"host/{number}.json", hosts)
 
     checked = max((story["checked"] for story in linked), default=0)
-    write(out, "stats.json", {"years": year_stats(linked), "checked": day_of(checked)})
+    days = sorted(groups["day"])
+    months = Counter(day_of(story["posted"])[:7] for story in linked)
+    stats = {"years": year_stats(linked), "months": dict(sorted(months.items()))}
+    stats.update(checked=day_of(checked), days=[days[0], days[-1]])
+    write(out, "stats.json", stats)
     write(out, "graveyard.json", graveyard(linked))
     (out / "afterlife.csv.gz").write_bytes(export_csv(linked))
     files = sum(1 for path in out.rglob("*") if path.is_file())
