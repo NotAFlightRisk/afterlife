@@ -1,0 +1,12 @@
+{
+  "name": "afterlife",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-11-01",
+  "assets": {
+    "directory": "./build",
+    "binding": "ASSETS",
+    "not_found_handling": "404-page",
+    "run_worker_first": ["/day.xml"]
+  },
+  "routes": [{ "pattern": "afterlife.peng.ly", "custom_domain": true }]
+}

@@ -1,0 +1,135 @@
+:root {
+  color-scheme: light;
+  --surface: #f6f6ef;
+  --surface-sunk: #ebebdf;
+  --field: #fff;
+  --text: #000;
+  --text-muted: #696960;
+  --rule: #d6d6c8;
+  --focus: #4a6f9c;
+  --selection: #c9d6e6;
+
+  --fate-alive: #d6d6c8;
+  --fate-moved: #4a6f9c;
+  --fate-dead: #1c1c1a;
+  --fate-elsewhere: #7a7a70;
+  --fate-unsure: #8f8f85;
+  --hatch: repeating-linear-gradient(135deg, var(--fate-unsure) 0 1px, transparent 1px 3px);
+
+  --font: Verdana, Geneva, 'DejaVu Sans', sans-serif;
+  --size-xs: 0.6875rem;
+  --size-s: 0.75rem;
+  --size-m: 0.8125rem;
+  --size-l: 1rem;
+  --size-xl: clamp(1.125rem, 1rem + 1vw, 1.5rem);
+  --leading: 1.45;
+
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --gutter: 1rem;
+  --page: 68rem;
+  --measure: 70ch;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  scrollbar-color: var(--fate-elsewhere) var(--surface-sunk);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--surface);
+  color: var(--text);
+  font: var(--size-m) / var(--leading) var(--font);
+  caret-color: var(--focus);
+}
+
+::selection {
+  background: var(--selection);
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+  text-underline-offset: 0.15em;
+
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+p {
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+input:is([type='text'], [type='date']),
+button[type='submit'],
+.button {
+  padding: 0.2rem 0.5rem;
+  border: 1px solid var(--fate-elsewhere);
+  border-radius: 0;
+  background: var(--field);
+}
+
+button[type='submit'],
+.button {
+  background: var(--surface-sunk);
+  cursor: pointer;
+
+  &:hover {
+    background: var(--rule);
+    text-decoration: none;
+  }
+}
+
+table {
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  ::before,
+  ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
