@@ -37,7 +37,7 @@ export default defineConfig({
           'default-src': ['self'],
           'script-src': ['self', ...pulse],
           'connect-src': ['self', 'https://archive.org', ...pulse, ...oops],
-          'img-src': ['self', 'data:'],
+          'img-src': ['self', 'data:', 'https://portfolio.peng.ly'],
           'style-src': ['self', 'unsafe-inline'],
           'base-uri': ['none'],
           'form-action': ['self'],
