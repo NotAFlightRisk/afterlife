@@ -15,6 +15,28 @@
   );
   const analytics = Boolean(import.meta.env.PUBLIC_PLAUSIBLE_SCRIPT);
   const errors = Boolean(import.meta.env.PUBLIC_SENTRY_DSN);
+
+  const related = [
+    { slug: 'hearsay', name: 'hearsay', url: 'https://hearsay.peng.ly' },
+    { slug: 'git-star-ranking', name: 'git-star-ranking', url: 'https://git-star-ranking.com' },
+    {
+      slug: 'haveibeentrainedon',
+      name: 'Have I Been Trained On?',
+      url: 'https://haveibeentrainedon.peng.ly'
+    },
+    {
+      slug: 'enshittification',
+      name: 'The Enshittification Index',
+      url: 'https://enshittification.peng.ly'
+    },
+    { slug: 'fineprint', name: 'fineprint', url: 'https://fineprint.peng.ly' },
+    { slug: 'exitformat', name: 'Exit Format', url: 'https://exitformat.peng.ly' },
+    {
+      slug: 'android-rom-compat',
+      name: 'Android ROM Compat',
+      url: 'https://android-rom-compat.peng.ly'
+    }
+  ];
 </script>
 
 <svelte:head>
@@ -138,6 +160,18 @@ Disallow: /</code
     {/if}
   {/if}
 
+  <h2>Other things we've made</h2>
+  <ul class="related">
+    {#each related as app (app.slug)}
+      <li>
+        <a href={app.url}>
+          <img src="/apps/{app.slug}.svg" alt="" width="16" height="16" loading="lazy" />
+          {app.name}
+        </a>
+      </li>
+    {/each}
+  </ul>
+
   <h2>Got one wrong?</h2>
   <p>
     <a href="https://github.com/NotAFlightRisk/afterlife/issues/new?template=wrong_verdict.yml">
@@ -200,6 +234,21 @@ Disallow: /</code
 
     th[scope='row'] {
       text-align: start;
+    }
+  }
+
+  .related {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+
+    a {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-2);
     }
   }
 
